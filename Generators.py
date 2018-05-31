@@ -88,7 +88,7 @@ class DataGenerator():
     def generate_reg_line (self,reg_slope,reg_intercept): 
         ''' This method returns a vector containing a regression line specified 
         over [-dom_x_bound,dom_x_bound], defined by parameters reg_slope and 
-        reg_intercept. Used for visualisation purposes.
+        reg_intercept. Used for visualisation purposes, not needed for data gen.
         Parameters:
             @reg_slope: slope of the line (float)
             @reg_intercept: intercept of the line (float)
