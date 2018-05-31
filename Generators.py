@@ -85,10 +85,10 @@ class DataGenerator():
         self.batch_size = batch_size
         np.random.seed(seed=5)
         
-    def generate_reg_line (self,reg_slope,reg_intercept):
+    def generate_reg_line (self,reg_slope,reg_intercept): 
         ''' This method returns a vector containing a regression line specified 
         over [-dom_x_bound,dom_x_bound], defined by parameters reg_slope and 
-        reg_intercept 
+        reg_intercept. Used for visualisation purposes.
         Parameters:
             @reg_slope: slope of the line (float)
             @reg_intercept: intercept of the line (float)
@@ -104,7 +104,7 @@ class DataGenerator():
         line[:,0] = np.round(x_vals,num_dec)
         line[:,1] = np.round(y_vals,num_dec)
         self.regression_line = line
-        # TODO: Note this is for visualiation purposes
+        
     
     def generate_lattice (self,num_pts_x_lattice,num_pts_y_lattice):
         ''' This method returns a lattice over x and y coordinates
