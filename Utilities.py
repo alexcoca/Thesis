@@ -37,12 +37,11 @@ def generate_sym_rand_matrix(d):
     '''This helper generates a symmetric random matrix of size d x d'''
     Z = np.zeros((d,d))
     idx_u = np.triu_indices(d,1)
-    idx_l = np.tril_indices(d,-1)
     idx_diag = np.diag_indices(d)
     off_diag_entries = np.random.normal(size=(int((d*(d-1)/2)),))
     diag_entries = np.random.normal(size=(int(d),))
     Z[idx_u] = off_diag_entries
-    Z[idx_l] = off_diag_entries
+    Z = Z + Z.T
     Z[idx_diag] = diag_entries
     return Z
 

@@ -49,13 +49,13 @@ class Adassp():
         # Compute target space bound
         if self.y_bound == -1:
             self.y_bound = utils.compute_bound(y)
+            
+        # Helper constants
+        priv_const = (np.sqrt(np.log(6/self.delta))/(self.epsilon/3))*(self.X_bound**2)
+        d = int(np.shape(X)[1])
         
         # Calculate covariance matrix
         Sigma = np.transpose(X)@X
-        
-        # Helper constants
-        priv_const = (np.sqrt(np.log(6/self.delta))/(self.epsilon/3))*self.X_bound**2
-        d = int(np.shape(X)[1])
         
         # Smallest eigenvalues of empirical cov. matrix
         lambda_min = np.min(np.linalg.eig(Sigma)[0]) 
