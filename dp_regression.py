@@ -9,7 +9,7 @@ import numpy as np
 import Utilities as utils
 
 class Adassp():
-    def __init__(self,X,y):
+    def __init__(self):
         '''Params 
         @epsilon: privacy budget
         @delta: probability that the mechanism output distribution is 
@@ -20,23 +20,27 @@ class Adassp():
         self.delta = 1e-6
         self.X_bound = 1
         self.Y_bound = 1
-        self.X = X
-        self.y = y
+        self.X = []
+        self.y = []
         self.reg_parameters = []
         np.random.seed(seed=5)
         
-    def set_privacy_parameters(self,epsilon, X,X_bound=-1,y_bound=-1):
-        ''' This method can be used to set privacy parameter epsilon. Delta is automatically set.''' 
+    def set_privacy_parameters(self,epsilon,n,X_bound=-1,y_bound=-1):
+        ''' This method can be used to set privacy parameter epsilon. Delta is automatically set.
+        @ Parameters:
+            epsilon: privacy budget
+            n: number of data points
+            X_bound: feature space bound (sup ||x||_2 over the data universe X)
+            y_bound: target space bound (abs(y) if y is scalar, otherwise as per X_bound ''' 
         self.epsilon = epsilon
-        self.delta = np.min(1e-6,1/np.shape(X)[0])
+        self.delta = np.min(1e-6,1/n[0])
         self.rho = 0.01 # Bound on the error for ADASSP hold with prob 1 - rho
         self.X_bound = X_bound
-    def get_regression_coef(self,X,y):
+        
+    def release_regression_coef(self,X,y):
         ''' This method releases regression coeffients with differential privacy.
         The method used is sufficient statistics pertrurbation with adaptive damping (#TODO: add ref)
-        '''        
-        # Calculate covariance matrix
-        Sigma = np.transpose(X)@X
+        '''    
         
         # Compute feature space bound 
         if self.X_bound == -1:
@@ -45,6 +49,9 @@ class Adassp():
         # Compute target space bound
         if self.y_bound == -1:
             self.y_bound = utils.compute_bound(y)
+        
+        # Calculate covariance matrix
+        Sigma = np.transpose(X)@X
         
         # Helper constants
         priv_const = (np.sqrt(np.log(6/self.delta))/(self.epsilon/3))*self.X_bound**2
