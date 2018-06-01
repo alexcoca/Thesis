@@ -32,3 +32,24 @@ index = find_nearest(array,element)
 def find_nearest_idx(array,value):
     idx = (np.abs(array-value)).argmin()
     return idx
+
+def generate_sym_rand_matrix(d):
+    '''This helper generates a symmetric random matrix of size d x d'''
+    Z = np.zeros((d,d))
+    idx_u = np.triu_indices(d,1)
+    idx_l = np.tril_indices(d,-1)
+    idx_diag = np.diag_indices(d)
+    off_diag_entries = np.random.normal(size=(int((d*(d-1)/2)),))
+    diag_entries = np.random.normal(size=(int(d),))
+    Z[idx_u] = off_diag_entries
+    Z[idx_l] = off_diag_entries
+    Z[idx_diag] = diag_entries
+    return Z
+
+def compute_bound(x):
+    ''' This is technically the bound on the data universe which I aproximate using the 
+    training data. Assumes x is an nxd array where n is number of data points'''
+    if np.shape(x) > 1:
+        return np.max(np.linalg.norm(x,ord=2,axis=1))
+    else: 
+        return np.max(np.abs(x))
