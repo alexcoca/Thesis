@@ -5,12 +5,14 @@ Created on Fri Jun  1 16:04:16 2018
 @author: alexc
 """
 import numpy as np
+
 class DataLoader():
     
     def __init__(self):
         self.raw_data = []
         self.features = []
         self.targets = []
+        self.data = []
         self.categorical = False
         self.target_names = []
         self.feature_names = []
@@ -83,6 +85,7 @@ class DataLoader():
                 self.features = self.raw_data[:,features_idx]
                 targets_idx = features_idx[-1]+1+np.arange(len(targets))
                 self.targets = self.raw_data[:,targets_idx]
+                self.data =np.concatenate((self.features,self.targets),axis=1)
             else:
                 self.features = self.raw_data[self.feature_names]
                 self.targets = self.raw_data[self.target_names]
