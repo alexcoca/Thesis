@@ -5,6 +5,7 @@ Created on Fri Jun  1 16:04:16 2018
 @author: alexc
 """
 import numpy as np
+import mlutilities as mlutils
 
 class DataLoader():
     
@@ -55,7 +56,7 @@ class DataLoader():
             self.raw_data = np.array(self.raw_data,dtype=float)
 
     
-    def load(self,path,features=-1,targets=-1,num_samples=-1,max_feat_idx=10,max_targ_idx=13):
+    def load(self,path,features=-1,targets=-1,num_samples=-1,max_feat_idx=10,max_targ_idx=13,unique=False):
         '''
         This function loads the data from the file specified by path
         and selects the features and targets specified in the corresponding vectors. 
@@ -85,8 +86,14 @@ class DataLoader():
                 self.features = self.raw_data[:,features_idx]
                 targets_idx = features_idx[-1]+1+np.arange(len(targets))
                 self.targets = self.raw_data[:,targets_idx]
-                self.data =np.concatenate((self.features,self.targets),axis=1)
             else:
                 self.features = self.raw_data[self.feature_names]
                 self.targets = self.raw_data[self.target_names]
-                
+        
+        # Remove duplicate records from the data set
+        if unique:
+            self.features,unique_indices = mlutils.get_unique_records(self.features,number=False,indices=True)
+            self.targets = self.targets[unique_indices]
+        
+        # Complete data
+        self.data =np.concatenate((self.features,self.targets),axis=1)
