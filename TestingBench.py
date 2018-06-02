@@ -8,6 +8,7 @@ Created on Thu May 24 20:24:09 2018
 #Useful plotting indicatiors r--,bs,g^,b.,b*
 
 from Generators import DataGenerator
+from loaders import DataLoader
 import matplotlib.pyplot as plt
 import numpy as np
 import math
@@ -31,20 +32,29 @@ import math
 #print(lattice)
 #print(regression_line)
 #%% Test generation on that when more outputs are required compared to the number of lattice x coordinates
-generator = DataGenerator(batch_size=15)
-generator.generate_data_set(num_pts=60,reg_slope=2,reg_intercept=1,num_pts_x_lattice = 20,num_pts_y_lattice = 50)
-data_set = generator.data
-plt.figure(0)
-plt.scatter(data_set[:,0],data_set[:,1])
-generator = DataGenerator()
-generator.generate_data_set(num_pts=35,reg_slope=2,reg_intercept=1,num_pts_x_lattice = 100,num_pts_y_lattice = 50)
-data_set = generator.data
-plt.figure(1)
-plt.scatter(data_set[:,0],data_set[:,1])
-generator = DataGenerator()
-generator.generate_data_set(num_pts=15,reg_slope=3,reg_intercept=0.5,num_pts_x_lattice = 50,num_pts_y_lattice = 50)
-data_set = generator.data
-plt.figure(2)
-plt.scatter(data_set[:,0],data_set[:,1])
-
-
+#generator = DataGenerator(batch_size=15)
+#generator.generate_data_set(num_pts=60,reg_slope=2,reg_intercept=1,num_pts_x_lattice = 20,num_pts_y_lattice = 50)
+#data_set = generator.data
+#plt.figure(0)
+#plt.scatter(data_set[:,0],data_set[:,1])
+#generator = DataGenerator()
+#generator.generate_data_set(num_pts=35,reg_slope=2,reg_intercept=1,num_pts_x_lattice = 100,num_pts_y_lattice = 50)
+#data_set = generator.data
+#plt.figure(1)
+#plt.scatter(data_set[:,0],data_set[:,1])
+#generator = DataGenerator()
+#generator.generate_data_set(num_pts=15,reg_slope=3,reg_intercept=0.5,num_pts_x_lattice = 50,num_pts_y_lattice = 50)
+#data_set = generator.data
+#plt.figure(2)
+#plt.scatter(data_set[:,0],data_set[:,1])
+#%% Testing data loader
+path = 'C:/Users/alexc/OneDrive/Documents/GitHub/Thesis/Data/raw/solar/flare.data.2.txt'
+# Create data loader object and load data
+loader = DataLoader()
+features = list(range(3,9))
+targets = [10]
+loader.load(path,features=features,targets=targets,unique=True)
+# Extract features and targets and full data matrix
+features = loader.features
+targets = loader.targets
+data = loader.data

@@ -7,9 +7,8 @@ Created on Thu May 24 19:53:37 2018
 
 import numpy as np
 import matplotlib.pyplot as plt
-import Utilities as utils
-# import Errors 
 
+# import Errors 
 
 class DataGenerator():
     def __init__(self,reg_slope=1,reg_intercept=0,num_pts=20,frac_test=0.2,num_x_locs=20,\
