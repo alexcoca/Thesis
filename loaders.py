@@ -11,6 +11,9 @@ class DataLoader():
         self.raw_data = []
         self.features = []
         self.targets = []
+        self.categorical = False
+        self.target_names = []
+        self.feature_names = []
         
     def load_raw_data (self,path):
         ''' This method reads the data from the raw file and performs the
@@ -24,31 +27,63 @@ class DataLoader():
                     processed_line.append(entry)
                 else:
                     processed_line.append(float(entry))
-            processed_line=processed_line[3:] # Discard categorical features
+            processed_line=[processed_line[i] for i in self.features+self.targets]
             return processed_line
         
-        raw_data = []
         with open(path) as f:
+            first_line = f.readline() 
+            self.raw_data.append(process(first_line))
+            first_line = first_line.split()
+            for col_index in self.features:   # Check if there are categorical features
+                if first_line[col_index].isalpha() == True:
+                    self.categorical = True
+                    break
             for line in f:
-                raw_data.append(process(line))
-        raw_data = np.array(raw_data,dtype=float)
-        return raw_data
+                self.raw_data.append(process(line))
+        if self.categorical:
+            # Create feature and target names
+            feature_names = ['feature'+str(i) for i in range(len(self.features))]
+            target_names =  ['target'+str(i) for i in range(len(self.targets))]
+            names = feature_names + target_names
+            # Structure data as a record array
+            self.raw_data = np.rec.fromrecords(self.raw_data,names=names)
+            self.feature_names = feature_names
+            self.target_names = target_names
+        else: 
+            self.raw_data = np.array(self.raw_data,dtype=float)
+
     
-    def load(self,path,features=-1,targets=-1,num_samples=-1):
-        '''This function loads the data from the file specified by path
+    def load(self,path,features=-1,targets=-1,num_samples=-1,max_feat_idx=10,max_targ_idx=13):
+        '''
+        This function loads the data from the file specified by path
         and selects the features and targets specified in the corresponding vectors. 
         If @num_samples is specified (i.e., !=-1) then num_samples records are sampled from the 
         dataset.
-        If @features is set to -1 then all the features (columns 4-10 in the original data set) are selected
-        Note: Categorical attributes (columns 0,1,2 of the original data set) are excluded from 
-        the data set so feature 0 corresponds to the 4th column of the original data set
-        If @targets is set to -1 all targets (columns 11-13 in original data set) are selected.'''
-        
+        If @features is set to -1 then all the features (columns 1-10 in the original data set) are selected
+        If @targets is set to -1 all targets (columns 11-13 in the original data set) are selected.
+        Other parameters:
+            max_feat_idx: number of features the data set contains. Features are assumed to be in consecutive columns
+            max_targ_idx: number of targets the data set contains. Targets are assumed to be in consecutive columns starting
+            after the feature columns.
+        '''
+        if features == -1:
+            features = list(range(max_feat_idx))            
+        if targets == -1:
+            targets = list(range(max_feat_idx,max_targ_idx))
+    
         # Get raw data
-        self.raw_data = self.load_raw_data(path)
+        self.features = features
+        self.targets = targets
+        self.load_raw_data(path)
         
         # Return all data samples
         if num_samples == -1:
-            self.features = self.raw_data[:,features]
-            self.targets = self.raw_data[:,targets]
+            if not self.categorical:
+                features_idx = np.arange(len(features))
+                self.features = self.raw_data[:,features_idx]
+                targets_idx = features_idx[-1]+1+np.arange(len(targets))
+                self.targets = self.raw_data[:,targets_idx]
+            else:
+                self.features = self.raw_data[self.feature_names]
+                self.targets = self.raw_data[self.target_names]
                 
