@@ -123,26 +123,55 @@ def generateIntersection(dim=2,radius=1,lower_bound=-1,upper_bound=1,num_points=
     # Extract positive coordinates
     pos_lattice_coord = list(full_lattice_coord[full_lattice_coord >= 0.0])
     
-    
     # Define resurse_solutions, recursive procedure to compute solutions with x1>= x2>=...>=xd s.t. x_i <= sqrt(radius^2/dim)
-    def recurse_solutions(pos_lattice_coord,radius,dim,lower_bound,upper_bound):
+    def recurse_solutions(pos_lattice_coord, radius, dim,upper_bound):
+        ''' This function recursively determines all the solutions with the property 
+        x1>= x2>=...>=xd s.t. x_i <= upper_bound) '''
+        
         partial_solutions = []
-        for coordinate in reversed([entry for entry in pos_lattice_coord if entry <=bound]):
+        for coordinate in reversed([entry for entry in pos_lattice_coord if entry <=upper_bound]):
             if (dim == 1):
                 partial_solutions.append([coordinate])
             else:
-                for point in recurse_solutions(pos_lattice_coord,radius,dim-1,bound): 
-                    if coordinate <= point[-1]:
-                        if sum([i**2 for i in [coordinate]+point]) <= radius^2:
+                for point in recurse_solutions(pos_lattice_coord,radius,dim-1,upper_bound): 
+                    if coordinate <= point[-1]: # Ensures the ordering is satisfied
+                        if sum([i**2 for i in [coordinate]+point]) <= radius^2: # Ensure this is a valid solution
                             partial_solutions.append(point+[coordinate])
-        return (partial_solutions,lb)
-                            
+        if not partial_solutions:
+            assert False
+        return partial_solutions
+
+    def main_recursion(x_range,radius,dim,bound,pos_lattice_coordinates):
+        points = []
+        for x in x_range:
+            # Update radius
+            if dim > 1:
+                bound = math.sqrt((dim*bound**2-x**2)/(dim-1))
+            # Generate lower dimensional solutions with (*) property
+            low_d_soln = recurse_solutions(pos_lattice_coord,radius,dim-1,bound)
+            if low_d_soln:
+                for partial_solution in low_d_soln:
+                    candidate = [x]+partial_solution
+                    if sum([i**2 for i in candidate]) <= radius^2:
+                        points.append([x]+partial_solution)
+            x_range = [coordinate for coordinate in pos_lattice_coordinates if coordinate <= x and coordinate > bound]
+            # Base case: # TODO: correct this, probably not right
+            if dim == 1: # 
+                points.append([coordinate for coordinate in pos_lattice_coordinates if coordinate <= x and coordinate < bound ])
+                points.append(recurse_solutions(pos_lattice_coord,radius))
+            else:
+                for partial_entry in main_recursion(x_range,radius,dim-1,bound,pos_lattice_coordinates):
+                    points.append([x]+partial_entry)
+        return points
+    
     ub = math.sqrt(radius/dim)
+    # Determine all solutions with x1>=x2>=...>=xd and x_i <= ub for all i \in [d] (*)
     points.append(recurse_solutions(pos_lattice_coord,radius,dim,ub))
-    # Determine solutions for which x_1 is greater than the upper bound 
-    for coord_value in [i for i in partial_solutions if i > ub]:
-        radius = math.sqrt(radius**2-coord_var**2)/(dim-1))
-        recurse_solutions(pos_lattice_coord,radius,dim-1,ra)
+    # Determine range for x1
+    x_range = [i for i in pos_lattice_coord if i > ub]
+    # Recursively 
+    points.append(main_recursion(x_range,radius,dim,ub,pos_lattice_coord))
+
     return points
 
 generateIntersection(dim=2,radius=1,lower_bound=-1,upper_bound=1,num_points=9)
