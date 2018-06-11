@@ -8,6 +8,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from operator import itemgetter
 import math 
+import itertools
+from sympy.utilities.iterables import multiset_permutations
 #%%
 # Very simple implementation? Is it even correct?
 def generateIntegerIntersection(dim=2,radius=6):
@@ -144,35 +146,90 @@ def generateIntersection(dim=2,radius=1,lower_bound=-1,upper_bound=1,num_points=
     def main_recursion(x_range,radius,dim,bound,pos_lattice_coordinates):
         points = []
         for x in x_range:
+            # bound = math.sqrt(radius**2/dim)
             # Update radius
-            if dim > 1:
-                bound = math.sqrt((dim*bound**2-x**2)/(dim-1))
-            # Generate lower dimensional solutions with (*) property
-            low_d_soln = recurse_solutions(pos_lattice_coord,radius,dim-1,bound)
-            if low_d_soln:
-                for partial_solution in low_d_soln:
-                    candidate = [x]+partial_solution
-                    if sum([i**2 for i in candidate]) <= radius^2:
-                        points.append([x]+partial_solution)
-            x_range = [coordinate for coordinate in pos_lattice_coordinates if coordinate <= x and coordinate > bound]
+            if dim*bound**2 >= x**2: # This is a bit hacky?
+                if dim > 1:
+                    bound = math.sqrt((dim*bound**2-x**2)/(dim-1)) # Should the radius not be reset to its starting point when we 
+                # Generate lower dimensional solutions with (*) property
+                    x_range = [coordinate for coordinate in pos_lattice_coordinates if coordinate <= x and coordinate > bound]
             # Base case: # TODO: correct this, probably not right
             if dim == 1: # 
-                points.append([coordinate for coordinate in pos_lattice_coordinates if coordinate <= x and coordinate < bound ])
-                points.append(recurse_solutions(pos_lattice_coord,radius))
+                possible_solution_lower = [coordinate for coordinate in pos_lattice_coordinates if coordinate <= x and coordinate > bound ]
+                if possible_solution_lower:
+                    points.append(possible_solution_lower)
+                # possible_solution_upper = recurse_solutions(pos_lattice_coord,radius,dim,bound)
+                # if possible_solution_upper:
+                #    points.append(possible_solution_upper)
             else:
                 for partial_entry in main_recursion(x_range,radius,dim-1,bound,pos_lattice_coordinates):
-                    points.append([x]+partial_entry)
+                    # Track solutions for which x_i < ub
+                    low_d_soln = recurse_solutions(pos_lattice_coord,radius,dim-1,bound)
+                    if low_d_soln:
+                        for partial_solution in low_d_soln:
+                            candidate = [x]+partial_solution
+                            if sum([i**2 for i in candidate]) <= radius**2:
+                                points.append(candidate)
+                    # Track the solutions for which x_i > ub (aka for which x is in x_range)
+                    candidate = [x]+partial_entry
+                    if sum([i**2 for i in candidate]) <= radius**2:
+                        points.append(candidate)                    
         return points
     
+    def generate_signed_solutions(points,dim):
+        
+        def generate_signs(dim):
+            signs = []
+            for value in range(2**dim):
+                signs.append([int(x) for x in list(bin(value)[2:].zfill(dim))])
+            return signs
+        
+        def remove_duplicates(k):
+          newk = []
+          for i in k:
+            if i not in newk:
+              newk.append(i)
+          return newk        
+                
+        signs_list = generate_signs(dim)
+        solutions = []
+        for point in points:
+            if 0.0 in point:
+                for sign_combination in signs_list:
+                    solutions.append(remove_duplicates([-x if y == 0 and x > 0 else x*y for x,y in zip(point,sign_combination)]))
+            else:
+                for sign_combination in signs_list:
+                    solutions.append([-x if y == 0 else x*y for x,y in zip(point,sign_combination)])
+        return solutions
+            
+    def generate_permuted_solutions(points):
+        solutions = []
+        for point in points:
+                solutions.extend(list(multiset_permutations(point)))
+        return points
+                
     ub = math.sqrt(radius/dim)
     # Determine all solutions with x1>=x2>=...>=xd and x_i <= ub for all i \in [d] (*)
-    points.append(recurse_solutions(pos_lattice_coord,radius,dim,ub))
+    points.extend(recurse_solutions(pos_lattice_coord,radius,dim,ub))
     # Determine range for x1
     x_range = [i for i in pos_lattice_coord if i > ub]
-    # Recursively 
-    points.append(main_recursion(x_range,radius,dim,ub,pos_lattice_coord))
-
+    # Recursively determine the remainder of the solutions
+    points.extend(main_recursion(x_range,radius,dim,ub,pos_lattice_coord))
+    # points = generate_signed_solutions(points,dim)
+    # points = generate_permuted_solutions(points)
+    
     return points
 
-generateIntersection(dim=2,radius=1,lower_bound=-1,upper_bound=1,num_points=9)
+def bruteNonIntegerIntersection(dim,radius,num_points=5,lower_bound=-1,upper_bound=1):
+    coord_array = list(np.linspace(lower_bound,upper_bound,num=num_points,endpoint=True))
+    lattice_coordinates = [coord_array for i in range(dim)]
+    flat_grid = np.array(np.meshgrid(*lattice_coordinates)).T.reshape(-1,dim)
+    intersection = flat_grid[np.linalg.norm(flat_grid,ord=2,axis=1) <= radius] 
+    return (intersection,coord_array) 
+
+dim = 2
+points = generateIntersection(dim=2,radius=1,lower_bound=-1,upper_bound=1,num_points=5)
+# intersection_m2,coord_array_m2 = bruteNonIntegerIntersection(dim,radius,num_points=num_points,lower_bound=lower_bound,upper_bound=upper_bound)
+
+#%% What s
 
