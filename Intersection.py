@@ -10,6 +10,7 @@ from operator import itemgetter
 import math 
 import itertools
 from sympy.utilities.iterables import multiset_permutations
+
 #%%
 # Very simple implementation? Is it even correct?
 def generateIntegerIntersection(dim=2,radius=6):
@@ -195,8 +196,17 @@ def generateIntersection(dim=2,radius=1,lower_bound=-1,upper_bound=1,num_points=
         solutions = []
         for point in points:
             if 0.0 in point:
-                for sign_combination in signs_list:
-                    solutions.append(remove_duplicates([-x if y == 0 and x > 0 else x*y for x,y in zip(point,sign_combination)]))
+                temp_sign_list = []
+                temp = []
+                # Find 0 indices 
+                zero_indices = [i for i,e in enumerate(point) if e == 0.0]
+                temp_sign_list = generate_signs(dim-len(zero_indices))
+                for sign_combination in temp_sign_list:
+                    temp.append([-x if y == 0 else x*y for x,y in zip([entry for entry in point if entry != 0.0],sign_combination)])
+                for zero_free_soln in temp:
+                    for index in zero_indices:
+                        zero_free_soln.insert(index,0.0)
+                    solutions.append(zero_free_soln)
             else:
                 for sign_combination in signs_list:
                     solutions.append([-x if y == 0 else x*y for x,y in zip(point,sign_combination)])
@@ -206,7 +216,7 @@ def generateIntersection(dim=2,radius=1,lower_bound=-1,upper_bound=1,num_points=
         solutions = []
         for point in points:
                 solutions.extend(list(multiset_permutations(point)))
-        return points
+        return solutions
                 
     ub = math.sqrt(radius/dim)
     # Determine all solutions with x1>=x2>=...>=xd and x_i <= ub for all i \in [d] (*)
@@ -215,8 +225,9 @@ def generateIntersection(dim=2,radius=1,lower_bound=-1,upper_bound=1,num_points=
     x_range = [i for i in pos_lattice_coord if i > ub]
     # Recursively determine the remainder of the solutions
     points.extend(main_recursion(x_range,radius,dim,ub,pos_lattice_coord))
-    # points = generate_signed_solutions(points,dim)
-    # points = generate_permuted_solutions(points)
+    points = generate_permuted_solutions(points)
+    points = generate_signed_solutions(points,dim)
+    
     
     return points
 
@@ -228,8 +239,11 @@ def bruteNonIntegerIntersection(dim,radius,num_points=5,lower_bound=-1,upper_bou
     return (intersection,coord_array) 
 
 dim = 2
-points = generateIntersection(dim=2,radius=1,lower_bound=-1,upper_bound=1,num_points=5)
-# intersection_m2,coord_array_m2 = bruteNonIntegerIntersection(dim,radius,num_points=num_points,lower_bound=lower_bound,upper_bound=upper_bound)
-
-#%% What s
+num_points = 5
+upper_bound = 1
+lower_bound = -1
+radius = 1.0
+points = generateIntersection(dim=2,radius=radius,lower_bound=lower_bound,upper_bound=upper_bound,num_points=num_points)
+intersection_m2,coord_array_m2 = bruteNonIntegerIntersection(dim=dim,radius=radius,num_points=num_points,lower_bound=lower_bound,upper_bound=upper_bound)
+#%% 
 

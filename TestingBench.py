@@ -24,7 +24,7 @@ from testutilies import bruteNonIntegerIntersection
 #points = data.plot_lattice(lattice)
 #%% Test that generate_data_set correctly sets the properties lattice and regression_line and x_coordinate generation
 #generator = generators.DataGenerator()
-#test = generator.lattice 
+#test = generator.lattice
 #print(test)
 #DataSet = generator.generate_data_set(num_pts=15,reg_slope=2,reg_intercept=1,num_pts_x_lattice=100,num_pts_y_lattice=50)
 #lattice = generator.lattice
