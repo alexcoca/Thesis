@@ -7,12 +7,13 @@ Created on Thu May 24 20:24:09 2018
 
 #Useful plotting indicatiors r--,bs,g^,b.,b*
 
-from Generators import DataGenerator
+from Generators import ContinuousGenerator
 from loaders import DataLoader
 import matplotlib.pyplot as plt
 import numpy as np
 import math
-
+from netmechanism import L2Lattice
+from testutilies import bruteNonIntegerIntersection
 #%% Test regression line using DataGenerator object
 #data = generators.DataGenerator(reg_slope=1,reg_intercept=0,num_pts_y_lattice=10)
 #line = data.generate_reg_line()
@@ -48,13 +49,45 @@ import math
 #plt.figure(2)
 #plt.scatter(data_set[:,0],data_set[:,1])
 #%% Testing data loader
-path = 'C:/Users/alexc/OneDrive/Documents/GitHub/Thesis/Data/raw/solar/flare.data.2.txt'
-# Create data loader object and load data
-loader = DataLoader()
-features = list(range(3,9))
-targets = [10]
-loader.load(path,features=features,targets=targets,unique=True)
-# Extract features and targets and full data matrix
-features = loader.features
-targets = loader.targets
-data = loader.data
+#path = 'C:/Users/alexc/OneDrive/Documents/GitHub/Thesis/Data/raw/solar/flare.data.2.txt'
+## Create data loader object and load data
+##loader = DataLoader()
+#features = list(range(3,9))
+#targets = [10]
+#loader = DataLoader()
+#loader.load(path,feature_indices=features,target_indices=targets,unique=True,boundrec=True)
+#data = loader.data
+#print (data)
+#loader = DataLoader()
+#loader.load(path,feature_indices=features,target_indices=targets,unique=True)
+#new_data = loader.data
+#print(new_data)
+#%% Test ContinuousGenerator class
+## Create a generator object
+#generator = ContinuousGenerator(d=1,n=10,seed=2)
+## Generate data
+#generator.generate_data(bound_recs=False)
+#dataset = generator.data
+#print(dataset)
+#generator.plot_data()
+#norms = np.linalg.norm(dataset,ord=2,axis=1)
+#print(norms)
+#%% Test L2Lattice Class
+
+OutputLattice = L2Lattice()
+dim = 4
+num_points = 11
+upper_bound = 1.0
+lower_bound = -1.0
+radius = 1.0
+OutputLattice.generate_l2_lattice(dim=dim,radius=radius,lower_bound=lower_bound,upper_bound=upper_bound,num_points=num_points)
+intersection_m2,coord_array_m2 = bruteNonIntegerIntersection(dim=dim,radius=radius,num_points=num_points,lower_bound=lower_bound,upper_bound=upper_bound)
+test_points = OutputLattice.points
+#Test that all the solutions have the correct length
+lengths = [len(x) == dim for x in test_points]
+assert np.all(lengths)
+# Test that all the solutions are unique
+assert np.unique(test_points,axis=0).shape[0] == len(test_points)
+# Test that the norms of the elements returned are correct
+norms = np.linalg.norm(np.array(test_points),ord=2,axis=1)
+assert np.all(norms <=radius)
