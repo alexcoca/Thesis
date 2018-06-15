@@ -55,7 +55,7 @@ class L2Lattice():
                 lb = math.sqrt(radius**2/(dim-1))
                 ub = x
                 x_prev.append(x)
-            if dim == 2: 
+            if dim == 1: 
                 # maybe we should think of dim == 2 as a base case? 
                 # Would dim == 1 make sense? Is the correct condition
                 # indeed min(x,lb)?

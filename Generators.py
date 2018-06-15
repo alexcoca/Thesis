@@ -7,10 +7,11 @@ Created on Thu May 24 19:53:37 2018
 
 import numpy as np
 import matplotlib.pyplot as plt
-
+from mpl_toolkits.mplot3d import Axes3D 
+import mlutilities as mlutils
 # import Errors 
 
-class DataGenerator():
+class DiscreteGenerator():
     def __init__(self,reg_slope=1,reg_intercept=0,num_pts=20,frac_test=0.2,num_x_locs=20,\
                  x_locs=[],y_locs=[],dom_x_bound=1,points_per_loc=1,num_pts_x_lattice=20,\
                  num_pts_y_lattice=50,batch_size=20):
@@ -206,5 +207,70 @@ class DataGenerator():
         # max_dist_fact so that you get enough points. Make sure that regr_line_value + max_dist
         # falls below y_upper_bound 
 
+
+class ContinuousGenerator():
+    
+    def __init__(self,d=1,n=1):
+        ''' Parameters:
+            @ d (dimensionality): number of features
+            @ n: number of data points'''
+        self.d = d
+        self.n = n
+        self.features = []
+        self.targets = []
+        self.data = []
+        self.coefs = []
+        self.variance = 1
+        self.mean = 0
+        self.seed = 23
         
+    def generate_data(self,seed=23,bound_recs=True):
+        ''' This function generates data on a hyperplane in R^d. 
+        The coefficients (@coeff) are sampled at random from [-1,1].
+        The domain points are sampled using a Gaussian distribution.
+        If bound_recs is set to True, then a transformation is applied to the
+        dataset such that the records have 2-norm <= unity.'''
+        
+        self.seed = np.random.seed(seed)
+        upper_bound = 1
+        lower_bound = -1
+        
+        # Sample coefficients
+        self.coefs = (upper_bound-lower_bound)*np.random.random((self.d,1)) + lower_bound
+        
+        # Sample features and normalise them s.t. their 2-norm is <=1
+        self.features = np.random.normal(loc=self.mean,scale=self.variance,size=(self.n,self.d))
+        if bound_recs == True:
+            self.features = mlutils.bound_records_norm(self.features)
+            y_idx = np.where(np.logical_and(self.lattice['y_vals'] >= lower_limit,self.lattice['y_vals'] <= upper_limit))
+
+        # Calculate targets
+        self.targets = np.sum(self.coefs.T*self.features,axis=1,keepdims=True)
+        
+        self.data = np.concatenate((self.features,self.targets),axis=1)
+         
+    def plot_data(self):
+        ''' Plot generated data if the dimensionality of the data is one'''
+        if self.d == 1:
+            plt.plot(self.features,self.targets,'b*')
+        if self.d == 2:
+            num_pts = 50
+            fig = plt.figure()
+            ax = fig.add_subplot(111,projection='3d')
+            # Create grid 
+            x_coord = np.linspace(np.min(self.features[:,0]),np.max(self.features[:,0]),num=num_pts,endpoint=True)
+            y_coord = np.linspace(np.min(self.features[:,1]),np.max(self.features[:,1]),num=num_pts,endpoint=True)
+            xx,yy = np.meshgrid(x_coord,y_coord)
+            # Evaluate the function on the grid
+            z = self.coefs[0]*xx + self.coefs[1]*yy
+            ax.plot_surface(xx,yy,z,alpha=0.2)
+            ax.scatter(self.features[:,0],self.features[:,1],self.targets[:])
+            for angle in range(0, 360):
+                ax.view_init(30, angle)
+                plt.draw()
+                plt.pause(.001)    
+        else:
+            # TODO: Error handling 
+            pass
+
     
