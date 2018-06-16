@@ -33,9 +33,8 @@ class L2Lattice():
                         # Ensure this is a valid solution
                         if sum([i**2 for i in [coordinate]+point]) <= radius: 
                             partial_solutions.append(point+[coordinate])
-        # TODO: Test & remove assertion 
-        if not partial_solutions:
-            assert False
+        #  It is possible that solutions do not exist: e.g. if x_1 = 1 and we have even number of points
+        #  , then there will not be any solution!                    
         return partial_solutions
     
     def main_recursion(self,radius,dim,pos_lattice_coord,lb,ub,x_prev,max_dim):

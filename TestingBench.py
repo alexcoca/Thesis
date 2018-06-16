@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import math
 from netmechanism import L2Lattice
-from testutilies import bruteNonIntegerIntersection
+from testutilities import bruteNonIntegerIntersection
 #%% Test regression line using DataGenerator object
 #data = generators.DataGenerator(reg_slope=1,reg_intercept=0,num_pts_y_lattice=10)
 #line = data.generate_reg_line()
@@ -75,8 +75,8 @@ from testutilies import bruteNonIntegerIntersection
 #%% Test L2Lattice Class
 
 OutputLattice = L2Lattice()
-dim = 4
-num_points = 11
+dim = 2
+num_points = 10
 upper_bound = 1.0
 lower_bound = -1.0
 radius = 1.0
