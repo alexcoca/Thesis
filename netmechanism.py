@@ -16,6 +16,8 @@ class L2Lattice():
         self.dim = 2 
         self.radius = 1
         self.points = []
+        self.culprits = []
+        self.num_dec = 10
     
     def ordered_recursion(self,pos_lattice_coord, radius, dim,upper_bound):
         ''' This function recursively determines all ordered solutions of dimension d
@@ -50,7 +52,7 @@ class L2Lattice():
             if radius**2 < x**2:
                 continue
             else:
-                radius = math.sqrt(radius**2- x**2)
+                radius = np.round(math.sqrt(radius**2- x**2),self.num_dec)
                 lb = math.sqrt(radius**2/(dim-1))
                 ub = x
                 x_prev.append(x)
@@ -70,12 +72,24 @@ class L2Lattice():
                 if low_d_soln:
                     for partial_soln in low_d_soln:
                         candidate = x_prev[0:max_dim-(dim-1)]+partial_soln
-                        assert sum([i**2 for i in candidate]) <= 1.0
+                        try:
+                            assert sum([i**2 for i in candidate]) <= 1.0
+                        except AssertionError:
+                            self.culprits.append(candidate)
                         self.points.append(candidate)
-                radius = 1.0 
-                x_prev = []
+                # Orig code had a simple reset x_prev = []  and radius = 1
+                # Another attempt to reset with x_prev = x_prev[-1] and 
+                #radius = math.sqrt(radius**2 + x**2) # maybe we need to round here for precision
+                # radius = np.round(math.sqrt(radius**2 + sum([element**2 for element in x_prev[(max_dim-(dim-1)):]])),decimals=5)
+                radius = np.round(math.sqrt(radius**2+x**2),self.num_dec)
+                #radius = math.sqrt(radius**2+x**2)
+                x_prev = x_prev[:(max_dim-dim)]
                 lb=math.sqrt(radius/dim)
                 ub = radius
+#                radius = 1.0
+#                x_prev = []
+#                lb=math.sqrt(radius/dim)
+#                ub = radius
         return points
     
     def generate_permuted_solutions(self,points):
@@ -115,16 +129,17 @@ class L2Lattice():
         return solutions    
         
     
-    def generate_l2_lattice(self,dim=2,radius=1,lower_bound=-1,upper_bound=1,num_points=5):
+    def generate_l2_lattice(self,dim=2,radius=1,lower_bound=-1,upper_bound=1,num_points=5,pos_ord=True):
         
         # Find lattice coordinates
-        full_lattice_coord = np.linspace(lower_bound,upper_bound,num=num_points,endpoint=True)
+        full_lattice_coord = np.round(np.linspace(lower_bound,upper_bound,num=num_points,endpoint=True),self.num_dec)
         # Extract positive coordinates
         pos_lattice_coord = list(full_lattice_coord[full_lattice_coord >= 0.0])
         self.points.extend(self.main_recursion(radius,dim,pos_lattice_coord,lb=math.sqrt(radius/dim),ub=radius,x_prev = [],max_dim=dim))
         self.points.extend(self.ordered_recursion(pos_lattice_coord,radius,dim,math.sqrt(radius/dim)))
-        self.points = self.generate_permuted_solutions(self.points)
-        self.points = self.generate_signed_solutions(self.points,dim)
+        if pos_ord:
+            self.points = self.generate_permuted_solutions(self.points)
+            self.points = self.generate_signed_solutions(self.points,dim)
         
 
 
