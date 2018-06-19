@@ -82,38 +82,38 @@ import testutilities
 #tmp = testutilities.filter_unsorted(intersection_m2)
 #filtered_results = testutilities.filter_signed(tmp)
 
-#%% Test L2Lattice Class
+#%% Test FeaturesLattice Class
 
-OutputLattice = FeaturesLattice()
-dim = 3
-num_points = 10
-upper_bound = 1.0
-lower_bound = -1.0
-radius = 1.0
-num_dec = 10
-r_tol = 1e-5
-OutputLattice.generate_l2_lattice(dim=dim,radius=radius,lower_bound=lower_bound,upper_bound=upper_bound,num_points=num_points,pos_ord=True,rel_tol=r_tol)
-intersection_m2 = testutilities.bruteNonIntegerIntersection(dim=dim,radius=radius,num_points=num_points,lower_bound=lower_bound,upper_bound=upper_bound,filtered = False,r_tol=r_tol)
-test_points = OutputLattice.points
-# Points that are returned by the fancy algorithm but not by brute
-differences_1 = testutilities.get_differences(test_points,intersection_m2)
-assert differences_1.size == 0
-# Points that are returned by the brute but not the fancy algorithm
-differences_2 = testutilities.get_differences(intersection_m2,test_points)
-assert differences_2.size == 0
-# Test that all the solutions have the correct length
-lengths = [len(x) == dim for x in test_points]
-assert np.all(lengths)
-# Test that all the solutions are unique
-assert np.unique(test_points,axis=0).shape[0] == len(test_points)
-# Test that the norms of the elements returned are correct
-norms = np.linalg.norm(np.array(test_points),ord=2,axis=1)
-close_norms = [True if math.isclose(np.linalg.norm(x),1,rel_tol=1e-7) == True else False for x in norms]
-small_norms = list(np.round(norms,decimals=num_dec) <=radius)
-all_norms = [x or y for x,y in zip(small_norms,close_norms)]
-# incorrect_points = np.array(test_points)[np.logical_not(all_norms)]
-incorrect_points = [point for (indicator,point) in zip(np.logical_not(all_norms),test_points) if indicator==True]
-assert np.all(all_norms)
-# Test that the two methods return the same number of solutions
-assert intersection_m2.shape[0] == len(test_points)
-
+#OutputLattice = FeaturesLattice()
+#dim = 3
+#num_points = 10
+#upper_bound = 1.0
+#lower_bound = -1.0
+#radius = 1.0
+#num_dec = 10
+#r_tol = 1e-5
+#OutputLattice.generate_l2_lattice(dim=dim,radius=radius,lower_bound=lower_bound,upper_bound=upper_bound,num_points=num_points,pos_ord=True,rel_tol=r_tol)
+#intersection_m2 = testutilities.bruteNonIntegerIntersection(dim=dim,radius=radius,num_points=num_points,lower_bound=lower_bound,upper_bound=upper_bound,filtered = False,r_tol=r_tol)
+#test_points = OutputLattice.points
+## Points that are returned by the fancy algorithm but not by brute
+#differences_1 = testutilities.get_differences(test_points,intersection_m2)
+#assert differences_1.size == 0
+## Points that are returned by the brute but not the fancy algorithm
+#differences_2 = testutilities.get_differences(intersection_m2,test_points)
+#assert differences_2.size == 0
+## Test that all the solutions have the correct length
+#lengths = [len(x) == dim for x in test_points]
+#assert np.all(lengths)
+## Test that all the solutions are unique
+#assert np.unique(test_points,axis=0).shape[0] == len(test_points)
+## Test that the norms of the elements returned are correct
+#norms = np.linalg.norm(np.array(test_points),ord=2,axis=1)
+#close_norms = [True if math.isclose(np.linalg.norm(x),1,rel_tol=1e-7) == True else False for x in norms]
+#small_norms = list(np.round(norms,decimals=num_dec) <=radius)
+#all_norms = [x or y for x,y in zip(small_norms,close_norms)]
+## incorrect_points = np.array(test_points)[np.logical_not(all_norms)]
+#incorrect_points = [point for (indicator,point) in zip(np.logical_not(all_norms),test_points) if indicator==True]
+#assert np.all(all_norms)
+## Test that the two methods return the same number of solutions
+#assert intersection_m2.shape[0] == len(test_points)
+#%% 

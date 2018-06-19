@@ -242,7 +242,7 @@ class ContinuousGenerator():
         self.features = np.random.normal(loc=self.mean,scale=self.variance,size=(self.n,self.d))
         if bound_recs == True:
             self.features = mlutils.bound_records_norm(self.features)
-            y_idx = np.where(np.logical_and(self.lattice['y_vals'] >= lower_limit,self.lattice['y_vals'] <= upper_limit))
+            # y_idx = np.where(np.logical_and(self.lattice['y_vals'] >= lower_limit,self.lattice['y_vals'] <= upper_limit))
 
         # Calculate targets
         self.targets = np.sum(self.coefs.T*self.features,axis=1,keepdims=True)

@@ -8,8 +8,6 @@ import math
 import numpy as np
 from sympy.utilities.iterables import multiset_permutations
 
-
-
 class FeaturesLattice():
     
     def __init__(self):
@@ -40,6 +38,7 @@ class FeaturesLattice():
         return partial_solutions
     
     def main_recursion(self,radius,dim,pos_lattice_coord,lb,ub,x_prev,max_dim):
+        
         # Determine the range of the variable currently being recursed on. If dim == max_dim
         # then x is x_1. Otherwise x is x_2 (if dim==max_dim-1) and so on.... These are the points inside
         # a square inscribed in the top-right quadrant
@@ -174,5 +173,7 @@ class FeaturesLattice():
             self.points = self.generate_signed_solutions(self.points,dim)
         
         # TODO: make pos_lattice_coord a property of the object? This would seem to make sense.
-
+        # TODO: Are lines 90-93 necessary for the algorithm? A: Should be, but a better understanding of the scopes during recursion would be nice
+        # TODO: I think a slight improvement could be made if I remeoved the reversed() in line 49 and used break instead of continue - would this
+        # work correctly or would affect the recursion. Early versions of the algo had break but didn't work.
 
