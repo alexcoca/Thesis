@@ -12,7 +12,7 @@ from loaders import DataLoader
 import matplotlib.pyplot as plt
 import numpy as np
 import math
-from netmechanism import L2Lattice
+from netmechanism import FeaturesLattice
 import testutilities
 #%% Test regression line using DataGenerator object
 #data = generators.DataGenerator(reg_slope=1,reg_intercept=0,num_pts_y_lattice=10)
@@ -84,21 +84,22 @@ import testutilities
 
 #%% Test L2Lattice Class
 
-OutputLattice = L2Lattice()
+OutputLattice = FeaturesLattice()
 dim = 3
 num_points = 10
 upper_bound = 1.0
 lower_bound = -1.0
 radius = 1.0
 num_dec = 10
-OutputLattice.generate_l2_lattice(dim=dim,radius=radius,lower_bound=lower_bound,upper_bound=upper_bound,num_points=num_points,pos_ord=True,precision=num_dec,rel_tol=1e-09)
-intersection_m2,coord_array_m2 = testutilities.bruteNonIntegerIntersection(dim=dim,radius=radius,num_points=num_points,lower_bound=lower_bound,upper_bound=upper_bound,filtered = False,num_dec=10,r_tol=1e-09)
+r_tol = 1e-5
+OutputLattice.generate_l2_lattice(dim=dim,radius=radius,lower_bound=lower_bound,upper_bound=upper_bound,num_points=num_points,pos_ord=True,rel_tol=r_tol)
+intersection_m2 = testutilities.bruteNonIntegerIntersection(dim=dim,radius=radius,num_points=num_points,lower_bound=lower_bound,upper_bound=upper_bound,filtered = False,r_tol=r_tol)
 test_points = OutputLattice.points
 # Points that are returned by the fancy algorithm but not by brute
-differences_1 = testutilities.get_differences_2(test_points,intersection_m2)
+differences_1 = testutilities.get_differences(test_points,intersection_m2)
 assert differences_1.size == 0
 # Points that are returned by the brute but not the fancy algorithm
-differences_2 = testutilities.get_differences_2(intersection_m2,test_points)
+differences_2 = testutilities.get_differences(intersection_m2,test_points)
 assert differences_2.size == 0
 # Test that all the solutions have the correct length
 lengths = [len(x) == dim for x in test_points]
@@ -115,20 +116,4 @@ incorrect_points = [point for (indicator,point) in zip(np.logical_not(all_norms)
 assert np.all(all_norms)
 # Test that the two methods return the same number of solutions
 assert intersection_m2.shape[0] == len(test_points)
-#%% Handling big cases with the recursive method
-OutputLattice = L2Lattice()
-dim = 10
-num_points = 25
-upper_bound = 1.0
-lower_bound = -1.0
-radius = 1.0
-OutputLattice.generate_l2_lattice(dim=dim,radius=radius,lower_bound=lower_bound,upper_bound=upper_bound,num_points=num_points,pos_ord=False)
-test_points = OutputLattice.points
-# Test that all the solutions have the correct length
-lengths = [len(x) == dim for x in test_points]
-# Test that all the solutions are unique
-assert np.unique(test_points,axis=0).shape[0] == len(test_points)
-# Test that the norms of the elements returned are correct
-norms = np.linalg.norm(np.array(test_points),ord=2,axis=1)
-incorrect_norms = norms[norms > radius]
-assert np.all(norms <=radius)
+
