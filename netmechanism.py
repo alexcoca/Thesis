@@ -17,9 +17,9 @@ class L2Lattice():
         self.radius = 1
         self.points = []
         self.culprits = []
-        self.num_dec = 10
+        self.num_dec = 20
     
-    def ordered_recursion(self,pos_lattice_coord, radius, dim,upper_bound):
+    def ordered_recursion(self,pos_lattice_coord, radius, dim,upper_bound,rel_tol):
         ''' This function recursively determines all ordered solutions of dimension d
         (x_1,x_2,...,x_d) where s.t. x_i <= upper_bound for all i in [d]. The ordering chosen is x_1>=x_2>=...>=x_d)'''
         partial_solutions = []
@@ -27,19 +27,22 @@ class L2Lattice():
             if (dim == 1):
                 partial_solutions.append([coordinate])
             else:
-                for point in self.ordered_recursion(pos_lattice_coord,radius,dim-1,upper_bound): 
+                for point in self.ordered_recursion(pos_lattice_coord,radius,dim-1,upper_bound,rel_tol): 
                     # Ensures the ordering is satisfied
-                    if coordinate <= point[-1]: 
+                    if coordinate <= point[-1]:# or math.isclose(coordinate,point[-1],rel_tol=rel_tol): 
+                        candidate = point+[coordinate]
+                        candidate_norm = np.linalg.norm(candidate,ord=2)
                         # TODO: we should not check if this is a solution technically 
                         # So final code should not contain this
                         # Ensure this is a valid solution
-                        if sum([i**2 for i in [coordinate]+point]) <= radius: 
+                        if math.isclose(candidate_norm,radius,rel_tol=rel_tol) or candidate_norm <= radius :
+                        #if np.round(sum([i**2 for i in [coordinate]+point]),self.num_dec) <= radius: 
                             partial_solutions.append(point+[coordinate])
         #  It is possible that solutions do not exist: e.g. if x_1 = 1 and we have even number of points
         #  , then there will not be any solution!                    
         return partial_solutions
     
-    def main_recursion(self,radius,dim,pos_lattice_coord,lb,ub,x_prev,max_dim):
+    def main_recursion(self,radius,dim,pos_lattice_coord,lb,ub,x_prev,max_dim,rel_tol):
         points = []
 #        if dim == max_dim:
 #            radius = 1.0
@@ -49,10 +52,18 @@ class L2Lattice():
         current_x_range =  [entry for entry in pos_lattice_coord if entry > lb and entry <=ub]
         for x in reversed(current_x_range):
             # Update radius
-            if radius**2 < x**2:
-                continue
+            if radius**2 < x**2: 
+                if math.isclose(radius**2,x**2,rel_tol=rel_tol):
+                    radius = 0.0
+                    lb = 0.0
+                    ub = x
+                    x_prev.append(x)
+                else:
+                    continue
             else:
-                radius = np.round(math.sqrt(radius**2- x**2),self.num_dec)
+                # radius = np.round(math.sqrt(radius**2- x**2),self.num_dec)
+                # lb = np.round(math.sqrt(radius**2/(dim-1)),self.num_dec)
+                radius = math.sqrt(radius**2- x**2)
                 lb = math.sqrt(radius**2/(dim-1))
                 ub = x
                 x_prev.append(x)
@@ -60,29 +71,39 @@ class L2Lattice():
                 # maybe we should think of dim == 2 as a base case? 
                 # Would dim == 1 make sense? Is the correct condition
                 # indeed min(x,lb)?
-                for entry in pos_lattice_coord:
-                    if entry <= min(x,lb):
-                        points.append([entry])
+#                for entry in pos_lattice_coord:
+#                    if entry <= min(x,lb):
+#                        points.append([entry])
+                # Alternative
+                if len(x_prev) == max_dim:
+                    # print("x_prev",x_prev)
+                    # self.culprits.append(x_prev)
+                    # assert np.round(sum([entry**2 for entry in x_prev]),self.num_dec) <= 1.0
+                    assert math.isclose(np.linalg.norm(x_prev,ord=2),1.0,rel_tol=rel_tol)
+                    self.points.append(x_prev)
+                    #TODO: make rel_tol a class property       
             else:
-                for partial_entry in self.main_recursion(radius,dim-1,pos_lattice_coord,lb,ub,x_prev,max_dim):
-                    candidate = x_prev+partial_entry
-                    if sum([i**2 for i in candidate]) <= 1.0:
-                        self.points.append(candidate)    
-                low_d_soln = self.ordered_recursion(pos_lattice_coord,radius,dim-1,lb)
+                #for partial_entry in self.main_recursion(radius,dim-1,pos_lattice_coord,lb,ub,x_prev,max_dim):
+#                    candidate = x_prev+partial_entry
+#                    if sum([i**2 for i in candidate]) <= 1.0:
+#                        self.points.append(candidate)    
+                self.main_recursion(radius,dim-1,pos_lattice_coord,lb,ub,x_prev,max_dim,rel_tol)
+                low_d_soln = self.ordered_recursion(pos_lattice_coord,radius,dim-1,lb,rel_tol)
                 if low_d_soln:
                     for partial_soln in low_d_soln:
                         candidate = x_prev[0:max_dim-(dim-1)]+partial_soln
                         try:
-                            assert sum([i**2 for i in candidate]) <= 1.0
+                            assert math.isclose(np.linalg.norm(candidate,ord=2),1.0,rel_tol=rel_tol) or (np.linalg.norm(candidate,ord=2) <= 1.0)
                         except AssertionError:
+                            print("Candidate:",candidate)
                             self.culprits.append(candidate)
                         self.points.append(candidate)
                 # Orig code had a simple reset x_prev = []  and radius = 1
                 # Another attempt to reset with x_prev = x_prev[-1] and 
                 #radius = math.sqrt(radius**2 + x**2) # maybe we need to round here for precision
                 # radius = np.round(math.sqrt(radius**2 + sum([element**2 for element in x_prev[(max_dim-(dim-1)):]])),decimals=5)
-                radius = np.round(math.sqrt(radius**2+x**2),self.num_dec)
-                #radius = math.sqrt(radius**2+x**2)
+                #radius = np.round(math.sqrt(radius**2+x**2),self.num_dec)
+                radius = math.sqrt(radius**2+x**2)
                 x_prev = x_prev[:(max_dim-dim)]
                 lb=math.sqrt(radius/dim)
                 ub = radius
@@ -129,14 +150,18 @@ class L2Lattice():
         return solutions    
         
     
-    def generate_l2_lattice(self,dim=2,radius=1,lower_bound=-1,upper_bound=1,num_points=5,pos_ord=True):
-        
+    def generate_l2_lattice(self,dim=2,radius=1,lower_bound=-1,upper_bound=1,num_points=5,pos_ord=True,precision=10,rel_tol=1e-06):
+        # Set precision for all calculations. This is necessary to avoid rounding error accumulation, which becomes
+        # an issue in high dimensions when many points are required
+        self.num_dec = precision
+        self.tol = 10**(-precision)
         # Find lattice coordinates
-        full_lattice_coord = np.round(np.linspace(lower_bound,upper_bound,num=num_points,endpoint=True),self.num_dec)
+        full_lattice_coord = np.linspace(lower_bound,upper_bound,num=num_points,endpoint=True) # Removed precision
         # Extract positive coordinates
         pos_lattice_coord = list(full_lattice_coord[full_lattice_coord >= 0.0])
-        self.points.extend(self.main_recursion(radius,dim,pos_lattice_coord,lb=math.sqrt(radius/dim),ub=radius,x_prev = [],max_dim=dim))
-        self.points.extend(self.ordered_recursion(pos_lattice_coord,radius,dim,math.sqrt(radius/dim)))
+        # Compute the lattice [TODO: finish commenting]
+        self.points.extend(self.main_recursion(radius,dim,pos_lattice_coord,lb=math.sqrt(radius/dim),ub=radius,x_prev = [],max_dim=dim,rel_tol=1e-06))
+        self.points.extend(self.ordered_recursion(pos_lattice_coord,radius,dim,math.sqrt(radius/dim),rel_tol=1e-06))
         if pos_ord:
             self.points = self.generate_permuted_solutions(self.points)
             self.points = self.generate_signed_solutions(self.points,dim)
