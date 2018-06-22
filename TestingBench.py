@@ -116,4 +116,18 @@ import testutilities
 #assert np.all(all_norms)
 ## Test that the two methods return the same number of solutions
 #assert intersection_m2.shape[0] == len(test_points)
-#%% 
+#%%  Testing TargetsLattice class
+from netmechanism import TargetsLattice
+from scipy.special import comb,factorial 
+
+num_points = 5
+dim = 3 
+
+TargetsLattice = TargetsLattice()
+TargetsLattice.generate_lattice(dim=dim,num_points=num_points)
+target_vectors = TargetsLattice.points
+# Make sure you don't have duplicate solutions
+assert np.unique(target_vectors,axis=0).shape[0] == target_vectors.shape[0]
+# Make sure the number of elements returned is correct
+num_elements = comb(num_points,dim)*factorial(dim)
+assert num_elements == target_vectors.shape[0]

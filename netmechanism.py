@@ -7,8 +7,15 @@ Created on Fri Jun 15 11:51:56 2018
 import math
 import numpy as np
 from sympy.utilities.iterables import multiset_permutations
+import mlutilities as mlutils
+import itertools
 
 class FeaturesLattice():
+    
+    '''A FeaturesLattice object contains, in the @points property, all vectors with 
+    norm less than @radius of dimensionality @dim. The coordinates of the vectors lie on a lattice
+    parametrised by its upper and lower limits, and the number of points in which the interval bounded
+    by them is discretised. The lattice is always symmetric.'''
     
     def __init__(self):
         self.dim = 2 
@@ -177,3 +184,47 @@ class FeaturesLattice():
         # TODO: I think a slight improvement could be made if I remeoved the reversed() in line 49 and used break instead of continue - would this
         # work correctly or would affect the recursion. Early versions of the algo had break but didn't work.
 
+class TargetsLattice():
+    
+    '''A TargetsLattice object contains all vectors of dimension d, whose individual 
+    entries are chosen from a discrete set of num_points points defined on the closed
+    [lower_bound,upper_bound] interval. All d! permutations are also included. The vectors
+    are stored in the .points property as a numpy array'''
+    
+    def __init__(self):
+        self.points = []
+    
+    def generate_lattice(self,dim=2,lower_bound=-1,upper_bound=1,num_points=5):
+        ''' Generates the lattice coordinate vector, the combinations of d points and their permuations. '''
+        # Necessary since we choose combinations of d elements from num_points
+        self.dimensionality = dim
+        # TODO: error handling, case d > num_points
+        
+        def generate_permutations(points):
+            """"Generates all the permutations of the solutions contained in the
+            points attribute"""
+            
+            solutions = []
+            
+            for point in self.points:
+                    solutions.extend(list(itertools.permutations(point,self.dimensionality)))
+            return solutions
+        
+        # Generate 1-d lattice 
+        full_lattice_coord = np.linspace(lower_bound,upper_bound,num=num_points,endpoint=True) 
+        
+        # Generate all combinations of subsets of size dim from the lattice coordinate array.
+        # These correspond to all possible assignments of (w_1,...,w_d)
+        combinations_idx = mlutils.findsubsets(range(len(full_lattice_coord)),self.dimensionality)
+        
+        # Generate all sets of targets
+        for combination_ids in combinations_idx:
+            self.points.append(full_lattice_coord[combination_ids])
+        
+        # Permute all sets of generated targets
+        self.points = np.array(generate_permutations(self.points))
+        
+        
+        
+
+    
