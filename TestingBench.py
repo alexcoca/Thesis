@@ -105,7 +105,7 @@ import testutilities
 #lengths = [len(x) == dim for x in test_points]
 #assert np.all(lengths)
 ## Test that all the solutions are unique
-#assert np.unique(test_points,axis=0).shape[0] == len(test_points)
+#assert np.unique(test_points,axis=0).shape[0] == test_points.shape[0]
 ## Test that the norms of the elements returned are correct
 #norms = np.linalg.norm(np.array(test_points),ord=2,axis=1)
 #close_norms = [True if math.isclose(np.linalg.norm(x),1,rel_tol=1e-7) == True else False for x in norms]
@@ -117,17 +117,17 @@ import testutilities
 ## Test that the two methods return the same number of solutions
 #assert intersection_m2.shape[0] == len(test_points)
 #%%  Testing TargetsLattice class
-from netmechanism import TargetsLattice
-from scipy.special import comb,factorial 
-
-num_points = 5
-dim = 3 
-
-TargetsLattice = TargetsLattice()
-TargetsLattice.generate_lattice(dim=dim,num_points=num_points)
-target_vectors = TargetsLattice.points
-# Make sure you don't have duplicate solutions
-assert np.unique(target_vectors,axis=0).shape[0] == target_vectors.shape[0]
-# Make sure the number of elements returned is correct
-num_elements = comb(num_points,dim)*factorial(dim)
-assert num_elements == target_vectors.shape[0]
+#from netmechanism import TargetsLattice
+#from scipy.special import comb,factorial 
+#
+#num_points = 5
+#dim = 3 
+#
+#TargetsLattice = TargetsLattice()
+#TargetsLattice.generate_lattice(dim=dim,num_points=num_points)
+#target_vectors = TargetsLattice.points
+## Make sure you don't have duplicate solutions
+#assert np.unique(target_vectors,axis=0).shape[0] == target_vectors.shape[0]
+## Make sure the number of elements returned is correct
+#num_elements = comb(num_points,dim)*factorial(dim)
+#assert num_elements == target_vectors.shape[0]
