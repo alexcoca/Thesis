@@ -7,13 +7,13 @@ Created on Thu May 24 20:24:09 2018
 
 #Useful plotting indicatiors r--,bs,g^,b.,b*
 
-from Generators import ContinuousGenerator
-from loaders import DataLoader
-import matplotlib.pyplot as plt
-import numpy as np
-import math
-from netmechanism import FeaturesLattice
-import testutilities
+#from Generators import ContinuousGenerator
+#from loaders import DataLoader
+#import matplotlib.pyplot as plt
+#import numpy as np
+#import math
+#from netmechanism import FeaturesLattice
+#import testutilities
 #%% Test regression line using DataGenerator object
 #data = generators.DataGenerator(reg_slope=1,reg_intercept=0,num_pts_y_lattice=10)
 #line = data.generate_reg_line()
@@ -84,7 +84,6 @@ import testutilities
 
 #%% Test FeaturesLattice Class
 
-#OutputLattice = FeaturesLattice()
 #dim = 3
 #num_points = 10
 #upper_bound = 1.0
@@ -92,6 +91,7 @@ import testutilities
 #radius = 1.0
 #num_dec = 10
 #r_tol = 1e-5
+#OutputLattice = FeaturesLattice()
 #OutputLattice.generate_l2_lattice(dim=dim,radius=radius,lower_bound=lower_bound,upper_bound=upper_bound,num_points=num_points,pos_ord=True,rel_tol=r_tol)
 #intersection_m2 = testutilities.bruteNonIntegerIntersection(dim=dim,radius=radius,num_points=num_points,lower_bound=lower_bound,upper_bound=upper_bound,filtered = False,r_tol=r_tol)
 #test_points = OutputLattice.points
@@ -131,3 +131,23 @@ import testutilities
 ## Make sure the number of elements returned is correct
 #num_elements = comb(num_points,dim)*factorial(dim)
 #assert num_elements == target_vectors.shape[0]
+#%% Testing save lattice functionality for FeaturesLattice class
+from netmechanism import FeaturesLattice
+import pickle
+
+dim = 3
+num_points = 12
+upper_bound = 1.0
+lower_bound = -1.0
+radius = 1.0
+num_dec = 10
+folder_path = 'C:/Users/alexc/OneDrive/Documents/GitHub/Thesis/Lattices'
+lattice_name='d_3_npt_12'
+r_tol = 1e-5
+OutputLattice = FeaturesLattice()
+OutputLattice.generate_l2_lattice(dim=dim,radius=radius,lower_bound=lower_bound,upper_bound=upper_bound,num_points=num_points,pos_ord=True,rel_tol=r_tol)
+original_data = OutputLattice.points
+OutputLattice.save_lattice(folder_path=folder_path,lattice_name=lattice_name)
+basepath = folder_path+"/"+lattice_name
+with open(basepath,"rb") as data:
+    reloaded_data = pickle.load(data)

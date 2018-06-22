@@ -9,6 +9,7 @@ import numpy as np
 from sympy.utilities.iterables import multiset_permutations
 import mlutilities as mlutils
 import itertools
+import os, pickle
 
 class FeaturesLattice():
     
@@ -22,6 +23,21 @@ class FeaturesLattice():
         self.radius = 1
         self.points = []
 
+    def save_lattice(self,folder_path,lattice_name):
+        ''' Saves the lattice to the location specified by @folder_name with
+        the name specified by @lattice_name.'''
+        
+        if not os.path.exists(folder_path):
+            os.mkdir(folder_path)
+            
+        full_path = folder_path+"/"+lattice_name
+       
+        # Raise an error if the target file exists
+        if os.path.exists(full_path):
+            assert False
+           
+        with open(full_path,"wb") as data:
+            pickle.dump(self.points,data)
     
     def ordered_recursion(self,pos_lattice_coord, radius, dim,upper_bound):
         ''' This function recursively determines all ordered solutions of dimension d
@@ -195,6 +211,22 @@ class TargetsLattice():
     
     def __init__(self):
         self.points = []
+        
+    def save_lattice(self,folder_path,lattice_name):
+        ''' Saves the lattice to the location specified by @folder_name with
+        the name specified by @lattice_name.'''
+        
+        if not os.path.exists(folder_path):
+            os.mkdir(folder_path)
+            
+        full_path = folder_path+"/"+lattice_name
+       
+        # Raise an error if the target file exists
+        if os.path.exists(full_path):
+            assert False
+           
+        with open(full_path,"wb") as data:
+            pickle.dump(self.points,data)
     
     def generate_lattice(self,dim=2,lower_bound=-1,upper_bound=1,num_points=5):
         ''' Generates the lattice coordinate vector, the combinations of d points and their permuations. '''
@@ -225,6 +257,10 @@ class TargetsLattice():
         
         # Permute all sets of generated targets
         self.points = np.array(generate_permutations(self.points))
+        
+
+            
+            
         
         
         
