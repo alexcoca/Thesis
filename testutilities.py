@@ -8,7 +8,7 @@ import numpy as np
 import operator
 import itertools
 import math
-
+import glob
 
 def bruteNonIntegerIntersection(dim,radius,num_points=5,lower_bound=-1,upper_bound=1,filtered=False,r_tol=1e-06):
     """ Generate a lattice inside the d-dimensional hypersphere. Brute force method,
@@ -140,4 +140,28 @@ def get_differences(array_a=[],array_b=[],rel_tol=1e-5):
     
     return differences
         
-
+def line_counter(path):
+    '''This function counts the total number of lines in the text files in the folder
+    indicated by @path.
+    A tuple (total_count,details) is returned. details is a list of tuples with the same
+    number of elements as files in the directory specified by @path, where the first 
+    entry is the line count and the second entry is the filename'''
+    
+    def blocks(files, size=65536):
+        '''Block read file '''
+        while True:
+            b = files.read(size)
+            if not b: break
+            yield b
+    # List all files in the dir specified by path
+    files = glob.glob(path+"/*.txt")
+    counts = []
+    names = []
+    for file in files:
+        # Keep track of files
+        names.append(file)
+        with open(file, "r",encoding="utf-8",errors='ignore') as f:
+            # Acumulate counts
+            counts.append((sum(bl.count("\n") for bl in blocks(f))))
+    # Create a (total_count,details) tuple
+    return (sum(counts),list(zip(counts,names)))
