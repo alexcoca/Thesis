@@ -83,12 +83,25 @@ def findsubsets(S,m):
     subsets = [list(x) for x in itertools.combinations(S,m)]
     return subsets
 
-def bound_records_norm(X):
+def bound_records_norm_deprecated(X):
     '''This function applies a transformation to a matrix X of n data records
-    that ensures that each data record has a norm less than 1.'''
+    that ensures that each data record has a norm less than 1.
+    
+    @WARNING: This makes all features positive, which might be undesirable.'''
     max_features = np.max(X,axis=0)
     min_features = np.min(X,axis=0)
     denum = (max_features-min_features)*np.sqrt(X.shape[1])
     X = (X-min_features)/denum
     return X 
 
+def bound_records_norm(X):
+    '''This function applies a transformation to a matrix X of n data records
+    that ensures that each data record has a norm less than 1.'''
+    
+    # Find the max norm of each row
+    max_row_norm = np.max(np.linalg.norm(X,ord=2,axis=1))
+    
+    # Divide each row by the max row norm to obtain X
+    X = X / max_row_norm    
+    
+    return X
