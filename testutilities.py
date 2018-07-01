@@ -211,3 +211,49 @@ def get_synthetic_F_tilde(synthetic_data,dim):
     F_tilde_r = np.concatenate((F_r,f_r), axis = 1)
     
     return F_tilde_r
+
+def calculate_recovered_scores(synthetic_data_sets, F_tilde_x, scaling_const, max_scaled_utility,dim):
+    ''' Given a set of @synthetic_data_sets, this function calculates the utilities 
+    and scores for the private data set characterised by F_tilde_x. 
+    @ max_scaled_utility: Maximum value of scaled utility used to implement exp-normalise trick
+    @ scaling_constant: Equal to the inverse global sensitivity of the utility times half the 
+    privacy parameter epsilon
+    @ dim: dimensionality of the private data''' 
+    
+    # Store F_tilde_r for each synthtic data set
+    F_tilde_rs = []
+    
+    for synthethic_data_set in synthetic_data_sets:
+        F_tilde_rs.append(get_synthetic_F_tilde(synthethic_data_set,dim))
+        
+    F_tilde_rs = np.array(F_tilde_rs)
+
+    # Calculate utitlites
+    utilities_array = - scaling_const*np.max(np.abs(F_tilde_x - F_tilde_rs),axis=(2,1))
+    
+    # Calculate scores
+    scores_array = np.exp(utilities_array - max_scaled_utility)
+    
+    return (scores_array, utilities_array)
+
+def retrieve_scores_from_results(results,sample_indices,max_scaled_utility):
+    ''' This test function is used to calculate the scores given 
+    @results, a data structure containing tuples formed of scaled
+    utility matrices for each batch [element at index 1] and the max.
+    scaled utility for that batch [element at index 0].'''
+    
+    scores = []
+    
+    batch_idxs = [element[0] for element in sample_indices]
+    row_idxs = [element[1] for element in sample_indices]
+    col_idxs = [element[2] for element in sample_indices]
+    
+    # Remember that max_score has not been subtracted from each result and 
+    # that exp was not taken
+    score_results = [(element[0], np.exp(element[1] - max_scaled_utility)) for element in results ]
+    
+    # Look-up the scores in the results data structures
+    for batch_idx, row_idx, col_idx in zip(batch_idxs, row_idxs, col_idxs):
+        scores.append(score_results[batch_idx][1][row_idx,col_idx])
+    
+    return scores
