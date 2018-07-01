@@ -210,7 +210,7 @@ class DiscreteGenerator():
 
 class ContinuousGenerator():
     
-    def __init__(self,d=1,n=1):
+    def __init__(self,d=1,n=1,mean=0,variance=1):
         ''' Parameters:
             @ d (dimensionality): number of features
             @ n: number of data points'''
@@ -220,8 +220,8 @@ class ContinuousGenerator():
         self.targets = []
         self.data = []
         self.coefs = []
-        self.variance = 1
-        self.mean = 0
+        self.variance = variance
+        self.mean = mean
         self.seed = 23
         
     def generate_data(self,seed=23,bound_recs=True):
@@ -231,9 +231,27 @@ class ContinuousGenerator():
         If bound_recs is set to True, then a transformation is applied to the
         dataset such that the records have 2-norm <= unity.'''
         
+        def get_indices(mask,n_rep):
+            ''' Finds the indices of the feature vectors that yielded a target 
+            >= target bound and returns a subset equal to the number of replacements that 
+            can be made as well as mask, which reflects the updated state of mask after samples replacement'''
+            
+            # Find the indices of the feature vectors which yield target >= target_bound
+            good_values = [False]
+            
+            # Choose the first n_rep indices corresponding to features that generate targets >= target_bound
+            indices = np.where(np.isin(mask,good_values))[0][:n_rep]
+            
+            # Update the mask to reflect the fact that some of the features might have been updated
+            mask[indices] = True
+            
+            return indices,mask
+        
+        
         self.seed = np.random.seed(seed)
         upper_bound = 1
         lower_bound = -1
+        target_bound = 1
         
         # Sample coefficients
         self.coefs = (upper_bound-lower_bound)*np.random.random((self.d,1)) + lower_bound
@@ -244,11 +262,35 @@ class ContinuousGenerator():
             self.features = mlutils.bound_records_norm(self.features)
             # y_idx = np.where(np.logical_and(self.lattice['y_vals'] >= lower_limit,self.lattice['y_vals'] <= upper_limit))
 
-        # Calculate targets
-        self.targets = np.sum(self.coefs.T*self.features,axis=1,keepdims=True)
+        # Generate targets restricted to [-target_bound,target_bound]
+        temp_targets = np.sum(self.coefs.T*self.features,axis=1,keepdims=True)
         
+        # Check if all targets are within the bounds 
+        if np.all(np.abs(temp_targets) <= target_bound):
+            self.targets = temp_targets
+        else:
+            # Determine how many points need to be resampled so that all feature vectors yield targets within the desired bound
+            mask = np.abs(temp_targets) <= target_bound
+            resample_no = len(temp_targets[np.logical_not(mask)])
+            while resample_no > 0:
+                
+                # Resample solutions and calculate their corresponding targets
+                proposed_features = np.random.normal(loc=self.mean,scale=self.variance,size=(resample_no,self.d))
+                proposed_targets = np.sum(self.coefs.T*proposed_features,axis=1,keepdims=True)
+                
+                # How many good targets have we sampled 
+                good_targets = proposed_targets[np.abs(proposed_targets) <= target_bound]
+                good_features = proposed_features[np.ravel(np.abs(proposed_targets) <= target_bound)]
+                resample_no = resample_no - len(good_targets)
+                # Replace the feature vectors which yield targets >= target_bound by feature vectors which yield targets <= target_bound
+                rep_indices,mask = get_indices(mask,len(good_targets))
+                self.features[rep_indices,:] = good_features
+            
+            # Calculate targets
+            self.targets = np.sum(self.coefs.T*self.features,axis=1,keepdims=True)
+                
         self.data = np.concatenate((self.features,self.targets),axis=1)
-         
+        
     def plot_data(self):
         ''' Plot generated data if the dimensionality of the data is one'''
         if self.d == 1:

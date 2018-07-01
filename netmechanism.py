@@ -10,6 +10,9 @@ from sympy.utilities.iterables import multiset_permutations
 import mlutilities as mlutils
 import itertools
 import os, pickle
+from scipy.special import comb, factorial
+from multiprocessing import Pool
+
 
 class FeaturesLattice():
     
@@ -258,11 +261,73 @@ class TargetsLattice():
         # Permute all sets of generated targets
         self.points = np.array(generate_permutations(self.points))
         
+class Utilities():
+    
+    def __init__(self):
+        self.util_type = 'second_moments'
+        self.value = 0
+    
+    def compute_utility(self,util_type):
+        
+        if self.util_type == 'second_moments':
+            self.eval_second_order_util(self)
+        elif self.util_type == 'first_moments':
+            self.eval_first_order_util(self)
 
+    
+    def eval_second_order_util(self):
+        self.value = 0
+        # TODO: Implement utility function evaluation for
+        # second order moment preservation case
+        pass
+    
+    def eval_first_order_util(self):
+        self.value = 0
+        # TODO: Implement utility function evaluation for 
+        # first order moment preservation case
+        pass            
             
-            
-        
-        
-        
+class OutcomeSpaceGenerator():
+    
+    def __init__(self):
+        #TODO: Think about the class constructor?
+        # What properties does this class need to have and how to set them?
+        self.outcome_features = []
+        self.outcome_targets = []
+        self.private_data = []
+        self.synth_data_type = 'second_moments'
+        pass
 
+    
+def generate_outcomes(self,outcome_features,outcome_targets,private_data,synth_data_type,epsilon):
+    # This method should:
+    # TODO: 1. Calculate the number of batches given the size of the outcome_feaatures (or just from the batch_size argument)
+    # TODO: 2. Establish number of workers and potentially open a parallel Pool with as many workers as logical cores
+    # TODO: 3. Monitor the number of processes spawned and keep launching new ones once confirmations from older processes about their completion
+    # are received. This is how the generator object should know which sets of permutations to generate.
+    # TODO: 4. The target of the pool should be the evaluate_batch_scores method
+    
+    pass
+
+def evaluate_batch_scores(self,batch):
+    '''Evaluates the scores of the feature + targets combination and, for each batch,
+    calculates the maximum score (so that at the end of the execution of all processes 
+    one can obtain the maximum score to use when calculating the partition function)'''
+    pass
+
+
+class Sampler():
+    pass
+
+
+
+
+
+        
+def est_outcome_space_size(N,d,k):
+    '''This function estimates the size of the outcome space as a function of:
+        @ N: Total number of vectors inside the d-dimensional sphere
+          d: private data dimensionality
+          k: Number of points in which the target interval is discretised '''
+    return comb(N,d,exact=True)*comb(k,d,exact=True)*factorial(d,exact=True)#/10**7
     

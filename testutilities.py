@@ -9,6 +9,7 @@ import operator
 import itertools
 import math
 import glob
+import pickle
 
 def bruteNonIntegerIntersection(dim,radius,num_points=5,lower_bound=-1,upper_bound=1,filtered=False,r_tol=1e-06):
     """ Generate a lattice inside the d-dimensional hypersphere. Brute force method,
@@ -153,15 +154,60 @@ def line_counter(path):
             b = files.read(size)
             if not b: break
             yield b
+            
     # List all files in the dir specified by path
     files = glob.glob(path+"/*.txt")
     counts = []
     names = []
+    
     for file in files:
-        # Keep track of files
+        # Keep track of file name
         names.append(file)
         with open(file, "r",encoding="utf-8",errors='ignore') as f:
             # Acumulate counts
             counts.append((sum(bl.count("\n") for bl in blocks(f))))
     # Create a (total_count,details) tuple
     return (sum(counts),list(zip(counts,names)))
+
+def check_sampling (sample_indices_set,results,max_score):
+    """ Given a set of sample indices, @sample_indices_set, represented as a tuple with
+    structure (batch_index, row_index, column_index,scaled_partition_function), this function uses the raw algorithm 
+    results to calculate the smallest postive "residual" of the partition function by subtracting
+    each score from the scaled_partition_function with coordinates <= (batch_index,row_idx,col_idx). The test checks whether
+    incrementing col_idx by 1 results in a negative partition function. If this is the case, then the sampling is correct.
+    
+    Notes: Raw results are represented as a tuple where the first element is max_score for the particular batch and the second 
+    is a matrix containing the eponents of the Gibbs distribution - hence np.sum(np.exp(scores-max_score)) is applied to calculate 
+    the scores exactly"""
+    
+    partition_residuals = []
+        
+    #for sample_indices in sample_indices_set:
+    for batch, row_idx, col_idx, partition_function in sample_indices_set:
+        
+        
+        if batch == 0:
+            partition_residuals.append( partition_function - np.sum(np.exp(results[batch][1]-max_score).flatten()[0:((row_idx)*(results[batch][1].shape[1]) + col_idx)]) )
+        else:
+            for index in range(batch):
+                partition_function = partition_function - np.sum(np.exp(results[index][1]-max_score))
+            partition_function = partition_function - np.sum( np.exp(results[batch][1]-max_score).flatten()[0:((row_idx)*(results[batch][1].shape[1]) + col_idx)] )
+            partition_residuals.append(partition_function)  
+        
+    return partition_residuals
+
+def get_synthetic_F_tilde(synthetic_data,dim):
+    ''' Computes the contribution of an outcome to the 
+    utility function'''
+    
+    # Compute F_tilde (equation (4.1), Chapter 4, Section 4.1.1)
+    # for the synthetic data
+    
+    const = (1/dim)
+    synth_features = synthetic_data[:, :-1]
+    synth_targets = synthetic_data[:, -1:].reshape(synthetic_data.shape[0],1)
+    F_r = const*synth_features.T@synth_features
+    f_r = const*synth_features.T@synth_targets
+    F_tilde_r = np.concatenate((F_r,f_r), axis = 1)
+    
+    return F_tilde_r
