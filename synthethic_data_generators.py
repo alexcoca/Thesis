@@ -25,8 +25,7 @@ class SyntheticDataGenerator():
             of the generate_data method
             @ target_latt_path: path to the lattice from which the synthethic target
             vectors are drawn. If not specified a lattice is intiliased upon call 
-            of the generate_data method 
-             '''
+            of the generate_data method '''
         
         # Synthetic data properties
         self.property_preserved = 'second_moments' # overwritten by the generate_data method
@@ -53,6 +52,9 @@ class SyntheticDataGenerator():
     
         # Storage for synthetic datasets
         self.synthetic_datasets = []
+        # Storage for sampling parameters - this can be passed to a Sampler() object 
+        # to gather more samples 
+        self.sampling_parameters = {}
         
     def initilise_lattices(self):        
         
@@ -111,10 +113,15 @@ class SyntheticDataGenerator():
                                              synth_targets = self.synthetic_targets, private_data = self.private_data,\
                                              property_preserved = self.property_preserved, privacy_constant = self.epsilon)
         
-        # TODO: Design Sampler() class
-#        self.sampler.sample(directory = self.outcome_space.directory, filenames = self.outcome_space.filenames, n_batches = self.outcome_space.n_batches,\
-#                            partition_function = self.outcome_space.partition_function)
-    
+        self.sampler.sample(directory = self.outcome_space.directory, filenames = self.outcome_space.filenames, n_batches = self.outcome_space.n_batches,\
+                            batch_size = self.outcome_space.batch_size, partition_function = self.outcome_space.partition_function, \
+                            max_scaled_utility = self.outcome_space.max_scaled_utility, dimensionality = self.dimensionality, synth_features = self.synthetic_features,\
+                            synth_targets = self.synthetic_targets)
+        
+        self.sampling_parameters = self.sampler.sampling_parameters
+        self.synthetic_datasets = self.sampler.sampled_data_sets
+        print ("The sampled datasets are",self.synthetic_datasets)
+        
         
         
         

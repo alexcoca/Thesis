@@ -48,9 +48,7 @@ class Slicer():
             return 2.0
         else:
             return 3.0
-
         
-    
     def parallel_batch_processing(self,workers):
         
         # Calculate the number of batches

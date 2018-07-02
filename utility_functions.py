@@ -22,7 +22,7 @@ def compute_second_moment_utility(targets, outcomes, dim, scaling_const, F_tilde
     f_r_tensor = (1/dim)*np.matmul(targets,outcomes)
     
     # Calculate F_r = 1/d Xh'Xh (' denotes transpose). This is applied for all Xh in the synth_features_tensor
-    F_r_tensor = (1/dim)*np.transpose(outcomes,axes=(0,2,1))@outcomes
+    F_r_tensor = (1/dim)*np.transpose(outcomes, axes = (0,2,1))@outcomes
     
     # Perform tensor expansions so that F_tilde_r = [F_r_tensor,f_r_tensor] can be constructed.
             
