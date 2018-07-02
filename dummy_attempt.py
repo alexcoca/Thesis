@@ -6,13 +6,11 @@ Created on Mon Jun 25 14:49:49 2018
 """
 
 import itertools
-from multiprocessing import Pool,current_process 
 from scipy.special import comb
 import math
-import multiprocessing.util as util
 import time,datetime
-import numpy as np
-
+from multiprocessing import Pool,current_process 
+import multiprocessing.util as util
 util.log_to_stderr(util.SUBDEBUG)
 
 class Slicer():
@@ -61,16 +59,16 @@ class Slicer():
         # completed the worker processes will exit
         pool.join() # wait for the worker processes to exit. One must call close() before using join()
         print("Calculating max utility")
-        self.max_util = max(results)
-
+        self.max_util = max(results)    
 
 if __name__=='__main__':
+    #__spec__ = None
     t_start = time.time()
     workers = 1
     test_object = Slicer(n=50,k=4,batch_size=2500,folder_name="C:/Users/alexc/OneDrive/Documents/GitHub/Thesis/Experiments/")
     test_object.parallel_batch_processing(workers)
     t_end = time.time()
-    print("Elapsed time with "+str(workers)+" workers is "+str(t_end-t_start))
+    print("Elapsed time with "+ str(workers) + " workers is " + str(t_end - t_start))
         
 
 

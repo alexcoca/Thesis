@@ -9,62 +9,67 @@ from data_generators import ContinuousGenerator
 from netmechanism import OutcomeSpaceGenerator, Sampler
 from synthethic_data_generators import SyntheticDataGenerator
 import time
+# from multiprocessing import Pool, current_process 
+import multiprocessing.util as util
+util.log_to_stderr(util.SUBDEBUG)
 
-# Initialise private_data object
-dimensionality = 2
-num_records = 20
-private_data = ContinuousGenerator(d = dimensionality, n = num_records)
-private_data.generate_data()
 
-# Initialise OutcomeSpaceGenerator()
-batch_size = 10000
-directory = 'C:/Users/alexc/OneDrive/Documents/GitHub/Thesis/Experiments/'
-parallel = False
-workers = 2
-partition_method = 'fast'
-OutcomeSpaceGenerator = OutcomeSpaceGenerator(directory = directory, batch_size = batch_size, parallel = parallel,\
-                                              partition_method = partition_method)
+if __name__ == '__main__':
+    # Initialise private_data object
+    # '__spec__' = None
+    dimensionality = 4
+    num_records = 20
+    private_data = ContinuousGenerator(d = dimensionality, n = num_records)
+    private_data.generate_data()
+    
+    # Initialise OutcomeSpaceGenerator()
+    batch_size = 15000
+    directory = 'C:/Users/alexc/OneDrive/Documents/GitHub/Thesis/Experiments/'
+    parallel = True
+    workers = 8
+    partition_method = 'fast'
+    OutcomeSpaceGenerator = OutcomeSpaceGenerator(directory = directory, batch_size = batch_size, parallel = parallel,\
+                                                  workers = workers, partition_method = partition_method)
+    
+    # Initialise Sampler() object
+    num_samples = 5
+    seed = 23
+    samples_only = False
+    SamplerInstance = Sampler(num_samples = num_samples, seed = seed, partition_method = partition_method, samples_only = samples_only)
+    
+    # Initialise SyntheticDataGenerator() object 
+    num_points_targets = 5
+    num_points_features = 5
+    epsilon = 0.1
+    SyntheticDataGenerator = SyntheticDataGenerator(private_data, OutcomeSpaceGenerator, Sampler = SamplerInstance,\
+                                                     privacy_constant = epsilon, num_points_features = num_points_features,
+                                                     num_points_targets = num_points_targets)
+     
+    t_start = time.time()
+    SyntheticDataGenerator.generate_data(property_preserved = 'second_moments')
+    t_end = time.time()
+    
+    if parallel == True:
+        print("Elapsed time with " + str(workers) + " workers is " + str(t_end - t_start))
+    else:
+        print("Elapsed time without parallelisation is " + str(t_end - t_start))
+    
+    # Synthetic data 
+    synthetic_data_integrated = SyntheticDataGenerator.synthetic_datasets
 
-# Initialise Sampler() object
-num_samples = 5
-seed = 23
-samples_only = False
-SamplerInstance = Sampler(num_samples = num_samples, seed = seed, partition_method = partition_method, samples_only = samples_only)
-
-# Initialise SyntheticDataGenerator() object 
-num_points_targets = 5
-num_points_features = 8
-epsilon = 0.1
-SyntheticDataGenerator = SyntheticDataGenerator(private_data, OutcomeSpaceGenerator, Sampler = SamplerInstance,\
-                                                 privacy_constant = epsilon, num_points_features = num_points_features,
-                                                 num_points_targets = num_points_targets)
-
-# if '__name__' == 'main': 
-t_start = time.time()
-SyntheticDataGenerator.generate_data(property_preserved = 'second_moments')
-t_end = time.time()
-
-if parallel == True:
-    print("Elapsed time with " + str(workers) + " workers is " + str(t_end - t_start))
-else:
-    print("Elapsed time without parallelisation is " + str(t_end - t_start))
-
-# Synthetic data 
-synthetic_data_integrated = SyntheticDataGenerator.synthetic_datasets
-params = SyntheticDataGenerator.sampling_parameters
-
-# Sample more data 
-
-# Re-initialise Sampler() object 
-num_samples  = 5
-partition_method = 'fast'
-seed = 24
-samples_only = True
-sampling_parameters = params
-AuxilliarySampler = Sampler(num_samples = num_samples, partition_method = partition_method, seed = seed, 
-                     samples_only = True, sampling_parameters = params)
-AuxilliarySampler.sample()
-new_samples = AuxilliarySampler.sampled_data_sets
+## Sample more data 
+    
+#params = SyntheticDataGenerator.sampling_parameters
+## Re-initialise Sampler() object 
+#num_samples  = 5
+#partition_method = 'fast'
+#seed = 24
+#samples_only = True
+#sampling_parameters = params
+#AuxilliarySampler = Sampler(num_samples = num_samples, partition_method = partition_method, seed = seed, 
+#                     samples_only = True, sampling_parameters = params)
+#AuxilliarySampler.sample()
+#new_samples = AuxilliarySampler.sampled_data_sets
 
     
 

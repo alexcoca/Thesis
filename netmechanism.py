@@ -11,10 +11,13 @@ import mlutilities as mlutils
 import itertools
 import os, pickle, glob
 from scipy.special import comb, factorial
-from multiprocessing import Pool
 import utility_functions
 import functools
 from netmechanism_helpers import FileManager
+
+from multiprocessing import Pool, current_process
+import multiprocessing.util as util
+util.log_to_stderr(util.SUBDEBUG)
 
 class FeaturesLattice():
     
@@ -267,7 +270,7 @@ class OutcomeSpaceGenerator(FileManager):
     
     def __init__(self, directory = '', experiment = '', synth_features = [], synth_targets = [], private_data = [],\
                  property_preserved = 'second_moments', privacy_constant = 0.1, batch_size = 100, parallel = False,\
-                 partition_method = 'fast'):
+                 workers = 1, partition_method = 'fast'):
         ''' @ parallel: specifies whether the calculations of the outcome space scores is to be 
             performed in parallel or not
             @ partition_method: Specifies which implementation is to be used to calculate the partition function'''
@@ -277,6 +280,7 @@ class OutcomeSpaceGenerator(FileManager):
         
         # Determines whether execution happens in parllel or not
         self.parallel = parallel
+        self.workers = workers
         self.partition_method = partition_method
         
         # User defined properties/ inputs
@@ -498,7 +502,7 @@ class OutcomeSpaceGenerator(FileManager):
             # Calculate and store scaled utilities for all outcomes, which are split in n_batches
             for batch_index in range(self.n_batches):
                 results.append(self.evaluate_sample_score(batch_index))
-            
+                
             # Filenames where the scaled utilities are stored - necessary for sampling step
             self.filenames = glob.glob(self.directory + "/*")
             
@@ -518,9 +522,19 @@ class OutcomeSpaceGenerator(FileManager):
         else:
             self.generate_outcomes_parallel()
     
-    def generate_outcomes_parallel():
+    def generate_outcomes_parallel(self):
         # TODO: make sure filenames is set correctly so the Sampler still works 
-        raise NotImplementedError ("Parallel computations not implemented!")
+        print("Number of batches is ", self.n_batches)
+        print("Starting parallel pool")
+        pool = Pool(self.workers)
+        results = pool.imap(self.evaluate_sample_score,range(self.n_batches))
+        pool.close() # prevent further tasks from being submitted to the pool. Once all tasks have been
+        # completed the worker processes will exit
+        pool.join() # wait for the worker processes to exit. One must call close() before using join()
+        print("Pool execution complete")
+        self.filenames = glob.glob(self.directory + "/*")
+        self.calculate_partition_function(results = results, partition_method = self.partition_method)
+        
     
 class Sampler(FileManager):
     def __init__(self, directory = '', filenames = [], num_samples = 5, n_batches = 0, partition_method = 'fast', seed = 23,\
@@ -740,4 +754,4 @@ def est_outcome_space_size(N,d,k):
           d: private data dimensionality
           k: Number of points in which the target interval is discretised '''
     return comb(N, d, exact = True)*comb(k, d, exact = True)*factorial(d, exact = True)#/10**7
-    
+
