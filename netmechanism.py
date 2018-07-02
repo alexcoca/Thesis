@@ -9,10 +9,11 @@ import numpy as np
 from sympy.utilities.iterables import multiset_permutations
 import mlutilities as mlutils
 import itertools
-import os, pickle
+import os, pickle, glob
 from scipy.special import comb, factorial
 from multiprocessing import Pool
-
+import utility_functions
+import functools
 
 class FeaturesLattice():
     
@@ -259,75 +260,383 @@ class TargetsLattice():
             self.points.append(full_lattice_coord[combination_ids])
         
         # Permute all sets of generated targets
-        self.points = np.array(generate_permutations(self.points))
-        
-class Utilities():
-    
-    def __init__(self):
-        self.util_type = 'second_moments'
-        self.value = 0
-    
-    def compute_utility(self,util_type):
-        
-        if self.util_type == 'second_moments':
-            self.eval_second_order_util(self)
-        elif self.util_type == 'first_moments':
-            self.eval_first_order_util(self)
-
-    
-    def eval_second_order_util(self):
-        self.value = 0
-        # TODO: Implement utility function evaluation for
-        # second order moment preservation case
-        pass
-    
-    def eval_first_order_util(self):
-        self.value = 0
-        # TODO: Implement utility function evaluation for 
-        # first order moment preservation case
-        pass            
+        self.points = np.array(generate_permutations(self.points))                  
             
-class OutcomeSpaceGenerator():
+class OutcomeSpaceGenerator():        
     
-    def __init__(self):
-        #TODO: Think about the class constructor?
-        # What properties does this class need to have and how to set them?
-        self.outcome_features = []
-        self.outcome_targets = []
-        self.private_data = []
-        self.synth_data_type = 'second_moments'
-        pass
-
-    
-def generate_outcomes(self,outcome_features,outcome_targets,private_data,synth_data_type,epsilon):
-    # This method should:
-    # TODO: 1. Calculate the number of batches given the size of the outcome_feaatures (or just from the batch_size argument)
-    # TODO: 2. Establish number of workers and potentially open a parallel Pool with as many workers as logical cores
-    # TODO: 3. Monitor the number of processes spawned and keep launching new ones once confirmations from older processes about their completion
-    # are received. This is how the generator object should know which sets of permutations to generate.
-    # TODO: 4. The target of the pool should be the evaluate_batch_scores method
-    
-    pass
-
-def evaluate_batch_scores(self,batch):
-    '''Evaluates the scores of the feature + targets combination and, for each batch,
-    calculates the maximum score (so that at the end of the execution of all processes 
-    one can obtain the maximum score to use when calculating the partition function)'''
-    pass
-
-
-class Sampler():
-    pass
-
-
-
-
-
+    def __init__(self, directory = '', experiment = '', synth_features = [], synth_targets = [], private_data = [],\
+                 property_preserved = 'second_moments', privacy_constant = 0.1, batch_size = 100, parallel = False,\
+                 partition_method = 'fast'):
+        ''' @ parallel: specifies whether the calculations of the outcome space scores is to be 
+            performed in parallel or not
+            @ partition_method: Specifies which implementation is to be used to calculate the partition function'''
+       
+        # Determines whether execution happens in parllel or not
+        self.parallel = parallel
+        self.partition_method = partition_method
         
+        # User defined properties/ inputs
+        self.directory = directory 
+        self.experiment_name = experiment
+        self.synth_features = synth_features
+        self.synth_targets = synth_targets
+        self.private_data = private_data
+        self.property_preserved = property_preserved
+        self.epsilon = privacy_constant
+        self.batch_size = batch_size
+        self.dimensionality = 2
+        self.scaling_const = 0
+        
+        # Contains the filenames of scaled utilities on disk. Set by the 
+        # generate_outcome and generate_outcomes_parallel methods
+        self.filenames = [] 
+        
+        self.n_batches = 0
+    
+        # Calculate private data utility
+        self.F_tilde_x = 0
+    
+        # Results storage    
+        self.batch_results = [] # Stores the max_score and the matrix containing the scores for that batch
+        self.partition_function = 0
+        self.max_scaled_utility = 0
+        
+        
+    def get_private_F_tilde (self, private_data):
+        '''Compute F_tilde (equation (4.1), Chapter 4, Section 4.1.1)
+        for the private data '''
+        
+        const = (1/self.private_data.features.shape[0])
+        F_x = const*self.private_data.features.T@self.private_data.features
+        f_x = const*self.private_data.features.T@self.private_data.targets
+        F_tilde_x = np.concatenate((F_x,f_x), axis = 1)
+        
+        return F_tilde_x 
+    
+    def save_batch(self, batch, filename, directory = '', overwrite = False):
+        ''' Saves the batch of scores to the location specified by @directory with
+        the name specified by @filename.'''
+        
+        # If directory is not specified, then the full path is provided in filename
+        # This is used to overwrite the files containing the raw scores during the 
+        # calculation of the partition function to avoid unnecessary duplication of 
+        # operations during the sampling step
+        
+        if not directory:
+            full_path = filename
+            
+            if overwrite:
+                with open(full_path, "wb") as data:
+                    pickle.dump(batch,data)
+            else:
+                # Overwriting data only alowed if this is explicitly mentioned
+                if os.path.exists(full_path):
+                    assert False
+        else:
+            # Create directories if they don't exist
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+                
+            full_path = directory + "/" + filename
+           
+            # Raise an error if the target file exists
+            if os.path.exists(full_path):
+                    raise IOError ("File already exists, delete before continuing")
+               
+            with open(full_path,"wb") as data:
+                pickle.dump(batch, data)
+                
+    def load_batch_scores(self, path):
+        ''' Returns the contents of the file specified by absolute path '''
+        with open(path, "rb") as data:
+            batch_scores = pickle.load(data)
+        return batch_scores
+
+    def retrieve_scores(self,filenames,batches=[]):
+        """ This method unpickles the files listed in the @filenames list, 
+        returning a list containing the contents of the unpickled files.
+        If @batches list is specified, then only the files to the corresponding
+        to entries of the list are loaded """
+        
+        
+        def get_batch_id(filename):
+            return int(filename[filename.rfind("_") + 1:])
+            
+        data = []
+        
+        # Filenames have to be sorted to ensure correct batch is extracted
+        filenames  = sorted(filenames, key = get_batch_id)
+        
+        if not batches:        
+            for filename in filenames:
+                data.append(self.load_batch_scores(filename))
+        else:
+            for entry in batches:
+                data.append(self.load_batch_scores(filenames[entry]))
+        return data
+                
+    def evaluate_sample_score(self, batch_index):
+        
+        if self.scaling_const == 0:
+            raise ValueError("Scaling constant has not been calculated!")
+    
+        # Storage structure
+        struct = {}
+        
+        # Store the batch index to be able to retrieve the correct sample during sampling step
+        struct['batch_index'] = batch_index
+        
+        # Generate a batch of combinations according to the batch_index
+        batch = itertools.islice(itertools.combinations(range(self.synth_features.shape[0]),self.dimensionality), \
+                                     (batch_index)*self.batch_size,(batch_index+1)*self.batch_size)
+        
+        # Evaluate utility - note that exponential is not taken as sum-exp trick is implemented to 
+        # evalute the scores in a numerically stable way during the sampling stage
+        if self.property_preserved == 'second_moments':
+            scaled_utilities_batch = utility_functions.compute_second_moment_utility(self.synth_targets, self.synth_features[list(batch),:],\
+                                                                                     self.dimensionality, self.scaling_const, self.F_tilde_x)
+        else:
+            scaled_utilities_batch = utility_functions.compute_first_moment_utility(self.synth_targets, self.synth_features[list(batch),:],\
+                                                                                     self.dimensionality, self.scaling_const, self.F_tilde_x)
+        struct ['scaled_utilities'] = scaled_utilities_batch
+        
+        # Max. utility is calculated in order to implement exp-normalise trick
+        max_scaled_util = np.max(scaled_utilities_batch)
+        
+        # Save scaled utilities to disk
+        filename = self.experiment_name +  "_" + str(batch_index)
+        self.save_batch(struct, filename, self.directory)
+        
+        # WARNING: Returning max_scaled_util is used for exp-normalise trick. score_batch allows
+        # one to calculate the partition function fast but might cause memory errors
+        # if many large batches are returned. 
+        
+        return (max_scaled_util,scaled_utilities_batch)
+    
+    def calculate_partition_function(self, results = [], partition_method = 'fast'):
+        ''' Calculates the partition function. If @method is 'fast' then the partition function is 
+        calculated from the iterable @results returned by the TBD method. If method is 'slow', then 
+        the partition function is calculated by loading the data saved by the @evaluate_sample_score
+        method during utility calculation.
+        
+        Notes: If @method is set to 'slow', then each of the scaled utility matrices saved on the disk is
+        transformed by subtracting the @max_scaled_utility (sum-exp trick) and taking the element-wise
+        matrix eponential, in preparation for the sampling step. This is NOT the case if the fast calculation
+        is used. The fast calculation is possible for small cases, where all the scores matrices and the max
+        scores can be kept in memory '''
+    
+        def get_batch_id(filename):
+            ''' Helper function that processes a file name to obtain the batch index. '''
+            return int(filename[filename.rfind("_") + 1:])
+        
+        def func(iterable, max_scaled_utility):
+            ''' Helper function that calculates the partition function given an iterable
+            @iterable which contains tuples of the form (scaled_utilities_batch, max_batch_scaled_util).''' 
+            return np.sum(np.exp(iterable[1]-max_scaled_utility))
+        
+        if partition_method == 'slow':
+            
+            # Raise an error if max_scaled utility is positive. Default is positive to that
+            # an error is raised if the utility is not calculated and the method is set to 'slow'
+            if self.max_scaled_utility > 0:
+                raise ValueError ("Maximum scaled utility incorrectly calculated!")
+            if not self.filenames:
+                raise RuntimeError ("Expected a list of filenames to load the scaled utilities!")
+         
+            # Filenames sorted by batch_index to ensure correct files are accessed during 
+            # reloading
+            filenames = sorted(self.filenames, key = get_batch_id)
+    
+            partition_function  = 0
+            
+            for batch in range(self.n_batches):
+                
+                # Retrive data for the corresponding batch
+                data = self.retrieve_scores(filenames,[batch])[0]
+                    
+                # Apply sum-exp trick when calc. partition to avod numerical issues
+                data['scaled_utilities'] = np.exp(data['scaled_utilities'] - self.max_scaled_utility)
+                partition_function += np.sum(data['scaled_utilities'])
+                
+                # Overwrite the raw batch scores with the scores calculated as per 
+                # Step 3 of the procedudre in Chapter 4, Section 4.1.3 
+                self.save_batch(data,filenames[batch], overwrite = True)
+            
+            self.partition_function = partition_function
+            
+            print ("Partition function is", str(partition_function))
+                
+        if partition_method == 'fast':
+            
+            # Raise an error if the results stucture is not provided and the method  arg is set
+            # to 'fast'
+            if not results:
+                raise RuntimeError ("Results iterable not provided!")
+            
+            # Create a copy of the results iterable
+            iter_1, iter_2 = itertools.tee(results)
+            
+            # Compute maximum scaled utility across all batches for exp-normalise trick
+            max_scaled_utility = functools.reduce((lambda x,y:(max(x[0],y[0]),np.zeros(shape=y[1].shape))),iter_1)[0]    
+    
+            # Compute partition function
+            partition_function = sum(map(functools.partial(func,max_scaled_utility = max_scaled_utility),iter_2))     
+            
+            self.partition_function = partition_function
+            self.max_scaled_utility = max_scaled_utility
+            
+            print ("Partition function is", str(partition_function))
+            print ("Max_scaled_utility is", max_scaled_utility)
+        
+    def generate_outcomes(self, experiment_name = '', synth_features = [], synth_targets = [],\
+                          private_data = [], property_preserved = 'second_moments', privacy_constant = 0.1):        
+            
+        # Set object properties
+        self.experiment_name = experiment_name
+        self.directory = self.directory + "/" + str(experiment_name) + "/OutcomeSpace"
+        self.synth_features = synth_features
+        self.synth_targets = synth_targets
+        self.private_data = private_data
+        self.property_preserved = property_preserved
+        # This is the inverse global sensitivity times the privacy parameter
+        if self.property_preserved == 'second_moments':
+            self.scaling_const = self.epsilon*self.private_data.features.shape[0]/(2*2)
+        else:
+            raise NotImplementedError
+            # TODO: Implement alternatives
+        self.epsilon = privacy_constant
+        self.dimensionality =  self.private_data.features.shape[1]   
+        self.n_batches = math.ceil(comb(self.synth_features.shape[0],\
+                                        self.dimensionality, exact=True)/self.batch_size)
+        self.F_tilde_x = self.get_private_F_tilde(private_data)
+        
+        if self.n_batches == 0:
+            raise ValueError ("Number of batches cannot be 0!")
+        
+        # Results container
+        results = []
+        
+        if self.parallel == False:
+            
+            # Calculate and store scaled utilities for all outcomes, which are split in n_batches
+            for batch_index in range(self.n_batches):
+                results.append(self.evaluate_sample_score(batch_index))
+            
+            # Filenames where the scaled utilities are stored - necessary for sampling step
+            self.filenames = glob.glob(self.directory + "/*")
+            
+            # Compute the partition function 
+            
+            if self.partition_method == 'fast':
+                self.calculate_partition_function(results = results, partition_method = self.partition_method)
+            else:
+                # Calculate the maximum scaled utility for sum_exp trick
+                max_scaled_utility = - math.inf
+                for result in results:
+                    if result[0] > max_scaled_utility:
+                        max_scaled_utility = result[0]
+                self.max_scaled_utility = max_scaled_utility
+                print ("Max_scaled_utility is", max_scaled_utility)
+                self.calculate_partition_function(partition_method = self.partition_method)
+        else:
+            self.generate_outcomes_parallel()
+    
+    def generate_outcomes_parallel():
+        # TODO: make sure filenames is set correctly so the Sampler still works 
+        raise NotImplementedError ("Parallel computations not implemented!")
+    
+class Sampler():
+    
+    def __init__(self, directory = '', filenames = [], num_samples = 5, n_batches = 0, partition_method = 'fast', seed = 23):
+        self.num_samples  = num_samples
+        self.partition_method = partition_method
+        self.seed = seed
+        self.filenames = filenames
+        
+        # Set by sample method
+        self.directory = ''
+        self.n_batches = 0
+        self.partition_function = 0
+        
+    def sample_dataset(self, n_batches, num_samples, filenames, partition_function):
+        
+        np.random.seed(self.seed)
+        
+        def get_sample(scaled_partition):
+            
+            def get_sample_idxs(scores,scaled_partition):
+                
+                row_idx = 0      
+                col_idx = 0 
+    
+                cum_scores = np.sum(scores, axis = 1)
+                candidate_partition = scaled_partition
+                
+                while candidate_partition > 0:
+                    candidate_partition = scaled_partition - cum_scores[row_idx]
+                    if candidate_partition > 0:
+                        scaled_partition = candidate_partition 
+                        row_idx += 1
+                
+                for element in scores[row_idx,:]:
+                    scaled_partition -= element
+                    if scaled_partition > 0:
+                        col_idx += 1
+                    else:
+                        break
+                return (row_idx,col_idx)
+            
+            # Retrive the data for every batch and subtract from partition function
+            
+            orig_partition = scaled_partition
+            
+            for batch in range(n_batches):
+                scores = retrieve_scores(filenames,batches=[batch])[0]['scaled_utilities']
+                candidate = scaled_partition - np.sum(scores)
+                if candidate > 0:
+                    scaled_partition = candidate
+                else: 
+                    row_idx, col_idx = get_sample_idxs(scores,scaled_partition)
+                    break
+            return (batch, row_idx, col_idx, orig_partition)
+       
+        def get_batch_id(filename):
+            return int(filename[filename.rfind("_")+1:])
+            
+        # Store sample indices
+        sample_indices = []
+         
+        # Filenames have to be sorted to ensure correct batch is extracted
+        filenames  = sorted(filenames, key = get_batch_id)
+        
+        for i in range(num_samples):
+            
+            # To sample, a random number in [0,1] is first generated and multiplied with the partition f
+            # (Step 5, in Chapter 4, Section 4.1.3)
+            scaled_partition = partition_function*np.random.random()
+            # To get a sample, the scores from each batch are subtracted from the scaled partition
+            # until the latter becomes negative. The data set for which this zero crossing is 
+            # attained is the sampled value ( Step 6, Chapter 4, Section 4.1.3)
+            sample_indices.append(get_sample(scaled_partition))
+    
+        return sample_indices        
+    
+    def sample(self, directory = '', filenames = [] , n_batches = 0, partition_function = 0):
+        
+        # Set class properties
+        self.directory = directory
+        self.n_batches = n_batches
+        self.partition_function = 0
+        self.filenames = filenames 
+        if self.partition_method == 'fast':
+            raise NotImplementedError
+        else:
+            self.sample_dataset(self.n_batches, self.num_samples, self.filenames, self.partition_function)
+
 def est_outcome_space_size(N,d,k):
     '''This function estimates the size of the outcome space as a function of:
         @ N: Total number of vectors inside the d-dimensional sphere
           d: private data dimensionality
           k: Number of points in which the target interval is discretised '''
-    return comb(N,d,exact=True)*comb(k,d,exact=True)*factorial(d,exact=True)#/10**7
+    return comb(N, d, exact = True)*comb(k, d, exact = True)*factorial(d, exact = True)#/10**7
     
