@@ -14,6 +14,7 @@ from scipy.special import comb, factorial
 from multiprocessing import Pool
 import utility_functions
 import functools
+from netmechanism_helpers import FileManager
 
 class FeaturesLattice():
     
@@ -262,7 +263,7 @@ class TargetsLattice():
         # Permute all sets of generated targets
         self.points = np.array(generate_permutations(self.points))                  
             
-class OutcomeSpaceGenerator():        
+class OutcomeSpaceGenerator(FileManager):        
     
     def __init__(self, directory = '', experiment = '', synth_features = [], synth_targets = [], private_data = [],\
                  property_preserved = 'second_moments', privacy_constant = 0.1, batch_size = 100, parallel = False,\
@@ -271,6 +272,9 @@ class OutcomeSpaceGenerator():
             performed in parallel or not
             @ partition_method: Specifies which implementation is to be used to calculate the partition function'''
        
+        # Initialise FileManager class
+        super(OutcomeSpaceGenerator, self).__init__()
+        
         # Determines whether execution happens in parllel or not
         self.parallel = parallel
         self.partition_method = partition_method
@@ -341,40 +345,11 @@ class OutcomeSpaceGenerator():
            
             # Raise an error if the target file exists
             if os.path.exists(full_path):
-                    raise IOError ("File already exists, delete before continuing")
+                    raise IOError ("File already exists, delete before continuing!")
                
             with open(full_path,"wb") as data:
                 pickle.dump(batch, data)
-                
-    def load_batch_scores(self, path):
-        ''' Returns the contents of the file specified by absolute path '''
-        with open(path, "rb") as data:
-            batch_scores = pickle.load(data)
-        return batch_scores
-
-    def retrieve_scores(self,filenames,batches=[]):
-        """ This method unpickles the files listed in the @filenames list, 
-        returning a list containing the contents of the unpickled files.
-        If @batches list is specified, then only the files to the corresponding
-        to entries of the list are loaded """
-        
-        
-        def get_batch_id(filename):
-            return int(filename[filename.rfind("_") + 1:])
-            
-        data = []
-        
-        # Filenames have to be sorted to ensure correct batch is extracted
-        filenames  = sorted(filenames, key = get_batch_id)
-        
-        if not batches:        
-            for filename in filenames:
-                data.append(self.load_batch_scores(filename))
-        else:
-            for entry in batches:
-                data.append(self.load_batch_scores(filenames[entry]))
-        return data
-                
+                              
     def evaluate_sample_score(self, batch_index):
         
         if self.scaling_const == 0:
@@ -510,6 +485,8 @@ class OutcomeSpaceGenerator():
                                         self.dimensionality, exact=True)/self.batch_size)
         self.F_tilde_x = self.get_private_F_tilde(private_data)
         
+        print("Number of batches is",self.n_batches)
+        
         if self.n_batches == 0:
             raise ValueError ("Number of batches cannot be 0!")
         
@@ -545,39 +522,104 @@ class OutcomeSpaceGenerator():
         # TODO: make sure filenames is set correctly so the Sampler still works 
         raise NotImplementedError ("Parallel computations not implemented!")
     
-class Sampler():
-    
-    def __init__(self, directory = '', filenames = [], num_samples = 5, n_batches = 0, partition_method = 'fast', seed = 23):
+class Sampler(FileManager):
+    def __init__(self, directory = '', filenames = [], num_samples = 5, n_batches = 0, partition_method = 'fast', seed = 23,\
+                 samples_only = False,  sampling_parameters = {}):
+        
+        # Initialise FileManager class
+        super(Sampler, self).__init__()
+        
+        # Properties that should be set explicitly during initialisation
         self.num_samples  = num_samples
         self.partition_method = partition_method
-        self.seed = seed
-        self.filenames = filenames
         
-        # Set by sample method
+        # If more samples are required, the seed is changed so that different
+        # samples are returned
+        if samples_only == False:
+            self.seed = seed
+        else:
+            self.seed = seed + 1
+            
+        self.samples_only = samples_only
+        self.sampling_parameters = sampling_parameters
+        
+        # Properties set by the sample method
         self.directory = ''
+        self.filenames = filenames
         self.n_batches = 0
+        self.batch_size = 0
         self.partition_function = 0
+        self.max_scaled_utility = 1
+        self.synth_features = []
+        self.synth_targets = []
+        self.dimensionality  = 2
         
-    def sample_dataset(self, n_batches, num_samples, filenames, partition_function):
+        # If the Sampler() is instanstiated just to draw more samples for a 
+        # previous experiment, the sampling parameters are passed to the object
+        # using the @parameters dictionary, which is used for initialisation
+        if samples_only:
+            self.unpack_arguments()
         
+        # Containers
+        self.sample_indices = []
+        self.sampled_data_sets = []
+        
+    def unpack_arguments(self):
+        self.directory = self.sampling_parameters['directory']
+        self.batch_size = self.sampling_parameters['batch_size']
+        self.n_batches = self.sampling_parameters['n_batches']
+        self.partition_function = self.sampling_parameters['partition_function']
+        self.filenames = self.sampling_parameters['filenames']
+        self.max_scaled_utility = self.sampling_parameters['max_scaled_utility']
+        self.synth_features = self.sampling_parameters['synth_features']
+        self.synth_targets = self.sampling_parameters['synth_targets']
+        self.dimensionality  = self.sampling_parameters['dimensionality']
+    
+    def pack_arguments(self):
+        self.sampling_parameters = {'directory': self.directory,'batch_size': self.batch_size,'n_batches': self.n_batches,\
+                            'partition_function': self.partition_function, 'filenames': self.filenames,\
+                            'max_scaled_utility':self.max_scaled_utility, 'synth_features': self.synth_features,
+                            'synth_targets': self.synth_targets,'dimensionality': self.dimensionality}
+        
+    def sample_datasets(self, n_batches, num_samples, filenames, partition_function):
+        ''' This method samples @num_samples data sets from the space generated by the
+        OutcomeSpaceGenerator object. The locations of the files containing unnormalized
+        probabilities (scores) of the outcomes are specified in the @filenames list. 
+        The partition function is calculated by the OutcomeSpaceGenerator.'''
+        
+        # Set random number generator for repeatablity 
         np.random.seed(self.seed)
         
         def get_sample(scaled_partition):
+            ''' This function subtracts the batch cumulative scores from the 
+            (scaled) partition function until the partition function becomes negative. 
+            When this occurs, the batch index is stored and a call is made 
+            to the get_sample_idxs function to determine the entry in the matrix
+            that corresponds to the zero crossing of the scaled partition function.'''
             
             def get_sample_idxs(scores,scaled_partition):
+                ''' This function returns the row (row_idx) and column (col_idx)
+                index of the entry in the scores matrix for which the partition function
+                becomes negative'''
                 
                 row_idx = 0      
                 col_idx = 0 
-    
+                
+                # Calculate cumulative scores for each batch
                 cum_scores = np.sum(scores, axis = 1)
                 candidate_partition = scaled_partition
                 
+                # Step 1: Subtract the batch cumulative scores until scaled partition function
+                # becomes negative. Remember the smallest positive value
                 while candidate_partition > 0:
                     candidate_partition = scaled_partition - cum_scores[row_idx]
                     if candidate_partition > 0:
                         scaled_partition = candidate_partition 
                         row_idx += 1
                 
+                # Subtract the entries of the row in which the partition function became
+                # negative at Step 1 from the smallest postive value, stopping when the
+                # scaled partion becomes negative
                 for element in scores[row_idx,:]:
                     scaled_partition -= element
                     if scaled_partition > 0:
@@ -586,12 +628,22 @@ class Sampler():
                         break
                 return (row_idx,col_idx)
             
-            # Retrive the data for every batch and subtract from partition function
+            # Retrive the saved scores and subtract from the scaled partition function 
+            # until it becomes negative. The data corresponding to the score for which
+            # this zero crossing occurs is the sampled data set
             
             orig_partition = scaled_partition
             
             for batch in range(n_batches):
-                scores = retrieve_scores(filenames,batches=[batch])[0]['scaled_utilities']
+                
+                # For the 'slow' mode, the sum-exp trick and exponentiation have been applied
+                scores = self.retrieve_scores(filenames,batches=[batch])[0]['scaled_utilities']
+               
+                # Perform sum_exp trick and exponentiate if the fast method has been used for 
+                # partition calculations
+                if self.partition_method == 'fast':
+                    scores = np.exp(scores - self.max_scaled_utility)
+                    
                 candidate = scaled_partition - np.sum(scores)
                 if candidate > 0:
                     scaled_partition = candidate
@@ -601,7 +653,7 @@ class Sampler():
             return (batch, row_idx, col_idx, orig_partition)
        
         def get_batch_id(filename):
-            return int(filename[filename.rfind("_")+1:])
+            return int(filename[filename.rfind("_") + 1:])
             
         # Store sample indices
         sample_indices = []
@@ -619,19 +671,68 @@ class Sampler():
             # attained is the sampled value ( Step 6, Chapter 4, Section 4.1.3)
             sample_indices.append(get_sample(scaled_partition))
     
-        return sample_indices        
-    
-    def sample(self, directory = '', filenames = [] , n_batches = 0, partition_function = 0):
+        self.sample_indices = sample_indices 
+
+    def recover_synthetic_datasets(self, sample_indices):
+        
+        def nth(iterable, n, default=None):
+            "Returns the nth item from iterable or a default value"
+            return next(itertools.islice(iterable, n, None), default)
+        
+        # Data containers
+        feature_matrices = []
+        synthetic_data_sets = []
+        
+        # Batches the samples were drawn from
+        batches = [element[0] for element in sample_indices]   
+        
+        # Combinations corresponding to the element which resulted in the zero crossing
+        # These are used to recover the feature matrices
+        combs_idxs = [element[1] for element in sample_indices]
+        
+        # List of indices of the target vectors for the sampled data sets
+        target_indices = [element[2] for element in sample_indices]
+        
+        # Feature matrix reconstruction 
+        for batch_idx, comb_idx in zip(batches, combs_idxs):
+            
+            # Reconstruct slice
+            recovered_slice = itertools.islice(itertools.combinations(range(self.synth_features.shape[0]), self.dimensionality),\
+                                               (batch_idx)*self.batch_size, (batch_idx+1)*self.batch_size)
+            
+            # Recover the correct combination 
+            combination = nth(recovered_slice, comb_idx)
+            print ("Recovered combination", combination)
+        
+            # Recover the feature matrix
+            feature_matrices.append(self.synth_features[combination,:])
+
+        # Reconstruct the targets for the synthethic feature matrix 
+        for feature_matrix,target_index in zip(feature_matrices,target_indices):
+            synthetic_data_sets.append(np.concatenate((feature_matrix, self.synth_targets[target_index,:].reshape(self.synth_targets.shape[1],1)), axis = 1))
+            
+        self.sampled_data_sets = synthetic_data_sets
+        
+    def sample(self, directory = '', filenames = [] , n_batches = 0, batch_size = 0, partition_function = 0, max_scaled_utility = 1, dimensionality = 2,\
+               synth_features = [], synth_targets = []):
         
         # Set class properties
-        self.directory = directory
-        self.n_batches = n_batches
-        self.partition_function = 0
-        self.filenames = filenames 
-        if self.partition_method == 'fast':
-            raise NotImplementedError
+        if self.samples_only:
+            self.unpack_arguments()
         else:
-            self.sample_dataset(self.n_batches, self.num_samples, self.filenames, self.partition_function)
+            self.directory = directory
+            self.batch_size = batch_size
+            self.n_batches = n_batches
+            self.partition_function = partition_function 
+            self.filenames = filenames 
+            self.max_scaled_utility = max_scaled_utility
+            self.synth_features = synth_features
+            self.synth_targets = synth_targets
+            self.dimensionality  = dimensionality 
+            self.pack_arguments()
+        
+        self.sample_datasets(self.n_batches, self.num_samples, self.filenames, self.partition_function)
+        self.recover_synthetic_datasets(self.sample_indices)
 
 def est_outcome_space_size(N,d,k):
     '''This function estimates the size of the outcome space as a function of:

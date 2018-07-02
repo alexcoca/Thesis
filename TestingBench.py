@@ -614,7 +614,7 @@ def calculate_partition_function_alt(iterable):
 
 def sample_dataset(n_batches,num_samples,filenames):
     
-    np.random.seed(23)
+    np.random.seed(24)
     
     def get_sample(scaled_partition):
         
@@ -719,10 +719,10 @@ def recover_synthetic_datasets(sample_indices):
 utility_arrays = [] # Utility arrays
 
 # Declare experiment parameters
-dim = 3
+dim = 2
 num_points_feat = 8
 num_points_targ = 5
-batch_size = 500
+batch_size = 10
 n_private = 20
 
 # Declare privacy paramters
@@ -881,7 +881,7 @@ print ("Alternative method for calculating partition function gives", partition_
 
 # Now let's test the sampling procedure...
 
-num_samples = 10
+num_samples = 5
 
 sample_indices = sample_dataset(n_batches, num_samples, filenames)
 
@@ -904,6 +904,8 @@ assert (all(mask))
 
 synthetic_data_sets = recover_synthetic_datasets(sample_indices)
 
+print ("The data sets sampled are", synthetic_data_sets)
+
 # Recalculate scores and utilities based on the recovered synthetic data sets
 calculated_scores, calculated_scaled_utilities = testutilities.calculate_recovered_scores(synthetic_data_sets, F_tilde_x, scaling_const, max_score, dim)
 
@@ -916,3 +918,7 @@ look_up_scores = testutilities.retrieve_scores_from_results(results,sample_indic
 
 # Compare retrieved and calculated scores
 assert  np.all(np.isclose(np.array(calculated_scores),np.array(look_up_scores),rtol = rtol))
+
+# To peform these tests, run second_moment_experiments_main.py with the same parameters
+
+assert  np.all(np.isclose(synthetic_data_integrated,synthetic_data_sets,rtol = rtol))

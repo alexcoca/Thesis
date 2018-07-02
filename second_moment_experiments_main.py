@@ -17,7 +17,7 @@ private_data = ContinuousGenerator(d = dimensionality, n = num_records)
 private_data.generate_data()
 
 # Initialise OutcomeSpaceGenerator()
-batch_size = 500
+batch_size = 10000
 directory = 'C:/Users/alexc/OneDrive/Documents/GitHub/Thesis/Experiments/'
 parallel = False
 workers = 2
@@ -26,15 +26,16 @@ OutcomeSpaceGenerator = OutcomeSpaceGenerator(directory = directory, batch_size 
                                               partition_method = partition_method)
 
 # Initialise Sampler() object
-num_samples = 1
+num_samples = 5
 seed = 23
-Sampler = Sampler(num_samples = num_samples, seed = seed, partition_method = partition_method)
+samples_only = False
+SamplerInstance = Sampler(num_samples = num_samples, seed = seed, partition_method = partition_method, samples_only = samples_only)
 
 # Initialise SyntheticDataGenerator() object 
 num_points_targets = 5
 num_points_features = 8
 epsilon = 0.1
-SyntheticDataGenerator = SyntheticDataGenerator(private_data, OutcomeSpaceGenerator, Sampler = [],\
+SyntheticDataGenerator = SyntheticDataGenerator(private_data, OutcomeSpaceGenerator, Sampler = SamplerInstance,\
                                                  privacy_constant = epsilon, num_points_features = num_points_features,
                                                  num_points_targets = num_points_targets)
 
@@ -47,6 +48,26 @@ if parallel == True:
     print("Elapsed time with " + str(workers) + " workers is " + str(t_end - t_start))
 else:
     print("Elapsed time without parallelisation is " + str(t_end - t_start))
+
+# Synthetic data 
+synthetic_data_integrated = SyntheticDataGenerator.synthetic_datasets
+params = SyntheticDataGenerator.sampling_parameters
+
+# Sample more data 
+
+# Re-initialise Sampler() object 
+num_samples  = 5
+partition_method = 'fast'
+seed = 24
+samples_only = True
+sampling_parameters = params
+AuxilliarySampler = Sampler(num_samples = num_samples, partition_method = partition_method, seed = seed, 
+                     samples_only = True, sampling_parameters = params)
+AuxilliarySampler.sample()
+new_samples = AuxilliarySampler.sampled_data_sets
+
+    
+
 
 
 
