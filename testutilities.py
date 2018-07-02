@@ -11,7 +11,7 @@ import math
 import glob
 import pickle
 
-def bruteNonIntegerIntersection(dim,radius,num_points=5,lower_bound=-1,upper_bound=1,filtered=False,r_tol=1e-06):
+def bruteNonIntegerIntersection(dim, radius, num_points = 5, lower_bound = -1, upper_bound = 1,filtered = False, r_tol = 1e-06):
     """ Generate a lattice inside the d-dimensional hypersphere. Brute force method,
     all coordinates are first generated on the d-dimensional hypercube and those outside the 
     hypershere discarded. 
