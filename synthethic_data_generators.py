@@ -8,11 +8,14 @@ Created on Thu Jun 21 15:53:51 2018
 from netmechanism import FeaturesLattice, TargetsLattice
 import pickle
 
-
-class SynthethicDataGenerator():
+class SyntheticDataGenerator():
     
-    def __init__(self, synth_data_type, epsilon, OutcomeSpace, Sampler, feat_latt_path='',target_latt_path=''):
+    def __init__(self, private_data, OutcomeSpace, Sampler = [], privacy_constant = 0.1, 
+                 num_points_features = 8 , num_points_targets = 5 , \
+                 feat_latt_path = '', target_latt_path = ''):
         ''' Parameters:
+            @ private_data: an object containing the private data. Features are stored
+            in the private_data.features and targets in private_data.targets.
             @ synth_data_type: a string indicating which type of 
             synthetic data set should be generated. Possible values include
             'second_moments', 'first_moments'
@@ -22,27 +25,34 @@ class SynthethicDataGenerator():
             of the generate_data method
             @ target_latt_path: path to the lattice from which the synthethic target
             vectors are drawn. If not specified a lattice is intiliased upon call 
-            of the generate_data method '''
+            of the generate_data method 
+             '''
         
         # Synthetic data properties
-        self.synth_data_type = synth_data_type
-        self.epsilon = epsilon
-        self.synthetic_features = []
-        self.synthetic_targets = []
-        self.synthetic_data = []
-        self.dimensionality = 2
-        self.num_points = 4 # Used for lattice initialisation
+        self.property_preserved = 'second_moments' # overwritten by the generate_data method
+        self.epsilon = privacy_constant
+        self.synthetic_features = [] # These are the lattice feature vectors, not the sampled feature sets
+        self.synthetic_targets = [] # These are combinations of lattice target scalars, not the sampled target vectors
+        self.num_points_features = num_points_features # Used for features lattice initialisation
+        self.num_points_targets = num_points_targets # Used for targets lattice initialisation
         
         # Outcome Space
         self.outcome_space = OutcomeSpace
         self.sampler = Sampler
         
         # Private data
-        self.private_data = []
+        self.private_data = private_data
         
-        # Lattices
+        # Data processing parameters
+        self.dimensionality = self.private_data.features.shape[1]
+        
+        # Lattice initialisation
         self.feat_latt_path = feat_latt_path
         self.target_latt_path = target_latt_path
+        self.initilise_lattices()
+    
+        # Storage for synthetic datasets
+        self.synthetic_datasets = []
         
     def initilise_lattices(self):        
         
@@ -54,62 +64,57 @@ class SynthethicDataGenerator():
         (@num_points) are necessary to create them. Lattices are always defined over [-1,1] or inside the
         unit ball.
         '''      
-        
+
         if not self.feat_latt_path:
-            print ("Initialising synthetic feature space lattice")
-            SyntheticFeatureSpace = FeaturesLattice()
-            SyntheticFeatureSpace.generate_l2_lattice(dim=self.dimensionality,num_points=self.num_points)
-            self.outcome_features = SyntheticFeatureSpace.points
-            print ("Synthetic feature space initialised")
+            if self.num_points_features < 2:
+                raise ValueError ("Incorrect feature lattice definition. Please provide feature lattice path \
+                                  or set num_points_features to be an integer greater than 2.")                
+            else:
+                print ("Initialising synthetic feature space lattice")
+                SyntheticFeatureSpace = FeaturesLattice()
+                SyntheticFeatureSpace.generate_l2_lattice(dim = self.dimensionality, num_points = self.num_points_features)
+                self.synthetic_features = SyntheticFeatureSpace.points
+                print ("Synthetic feature space initialised")
         else:
-            self.outcome_features = self.load_lattice(self.feat_latt_path)
+            self.synthetic_features = self.load_lattice(self.feat_latt_path)
         if not self.target_latt_path:
-            print ("Initialising synthethic target space lattice")
-            SynthethicTargetSpace = TargetsLattice()
-            SynthethicTargetSpace.generate_lattice(dim=self.dimensionality,num_points=self.num_points)
-            self.outcome_targets = SynthethicTargetSpace.points
-            print ("Synthethic target space initialised")
+            if self.num_points_targets < 2:
+                raise ValueError ("Incorrect targets lattice definition. Please provide targets lattice path \
+                                  or set num_points_targets to be an integer greater than 2.")
+            else:
+                print ("Initialising synthethic target space lattice")
+                SynthethicTargetSpace = TargetsLattice()
+                SynthethicTargetSpace.generate_lattice(dim = self.dimensionality, num_points = self.num_points_targets)
+                self.synthetic_targets = SynthethicTargetSpace.points
+                print ("Synthethic target space initialised")
         else:
-            self.outcome_targets = self.load_lattice(self.target_latt_path)
+            self.synthetic_targets = self.load_lattice(self.target_latt_path)
         
     def load_lattice(self,path):
         ''' Returns the contents of the file specified by absolute path '''
         with open(path,"rb") as data:
             lattice = pickle.load(data)
         return lattice
+
+    def generate_data(self, property_preserved):
         
-    def preserve_second_moments(self):
-        ''' This method generates a synthetic data set that presevers the second order moments
-        of the original data.
-        private_data: can be a ContinuousGenerator object that stores the data in the features/targets property or a DataLoader object'''
+        # Set property preserved 
+        self.property_preserved = property_preserved
         
-        # Initialise targets and features lattice
-        self.intialise_lattices()
+        # Define experiment name
+        experiment_name = "s_eps" + str(self.epsilon).replace(".","") + "d" +\
+                                str(self.dimensionality) + "nt" + str(self.num_points_targets) +\
+                                "nf" + str(self.num_points_features)
         
-        # Generate outcome space 
-        # TODO: Design OutcomeSpaceGenerator class 
-        self.OutcomeSpace.generate_outcomes(self.outcome_features,self.outcome_targets,self.private_data,self.synth_data_type,self.epsilon)
+        # Generate outcomes and compute their scores
+        self.outcome_space.generate_outcomes(experiment_name = experiment_name, synth_features = self.synthetic_features, \
+                                             synth_targets = self.synthetic_targets, private_data = self.private_data,\
+                                             property_preserved = self.property_preserved, privacy_constant = self.epsilon)
+        
         # TODO: Design Sampler() class
-        self.Sampler()
-        
-    def preserve_first_moments(self):
-        ''' This method generates a synthetic data set that presevers the first order moments
-        of the original data '''
-        pass
+#        self.sampler.sample(directory = self.outcome_space.directory, filenames = self.outcome_space.filenames, n_batches = self.outcome_space.n_batches,\
+#                            partition_function = self.outcome_space.partition_function)
     
-    def generate_data(self,private_data,num_points=5):
-        
-        self.private_data = private_data
-        self.num_points = num_points
-        self.dimensionality = private_data.features.shape[1]
-        
-        if self.synth_data_type == 'second_moments':
-            self.preserve_second_moments()
-        elif self.synth_data_type == 'first_moments':
-            self.preserve_first_moments()
-        else:
-            # TODO: Error handling 
-            pass
         
         
         
