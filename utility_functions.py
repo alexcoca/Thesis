@@ -42,7 +42,7 @@ def compute_second_moment_utility(targets, outcomes, dim, scaling_const, F_tilde
     
     # Utilities for the particular batch are returned as a matrix of dimension batch_size x p where p is the number of 
     # synthetic targets. Exp-normalise trick is implemented so the exponentiation is done in the sampling step
-    scaled_utilities = - scaling_const*np.max(np.abs(F_tilde_x-F_tilde_r),axis=(3,2))
+    scaled_utilities = - scaling_const*np.max(np.abs(F_tilde_x-F_tilde_r), axis=(3,2))
     
     return scaled_utilities
 
