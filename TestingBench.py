@@ -635,7 +635,7 @@ def sample_dataset(n_batches,num_samples,filenames):
             for element in scores[row_idx,:]:
                 scaled_partition -= element
                 if scaled_partition > 0:
-                    print ("The value of the score is", element)
+                    # print ("The value of the score is", element)
                     col_idx += 1
                 else:
                     break
@@ -719,10 +719,10 @@ def recover_synthetic_datasets(sample_indices):
 utility_arrays = [] # Utility arrays
 
 # Declare experiment parameters
-dim = 2
-num_points_feat = 25
-num_points_targ = 10
-batch_size = 250
+dim = 3
+num_points_feat = 8
+num_points_targ = 5
+batch_size = 500
 n_private = 20
 
 # Declare privacy paramters
@@ -738,7 +738,7 @@ OutputLattice2.generate_lattice(dim = dim,num_points = num_points_targ)
 targets = OutputLattice2.points
 
 # Generate synthethic data and compute its utility
-private_data = ContinuousGenerator(d = dim,n = n_private)
+private_data = ContinuousGenerator(d = dim, n = n_private)
 private_data.generate_data()
 F_tilde_x = get_private_F_tilde(private_data)
 
@@ -803,7 +803,6 @@ for reloaded_element, returned_element in zip(reloaded_data_batches,sliced_resul
 assert np.all(is_diff)
  
 # Calculating the partition function...
-
 
 if directory.rfind("*") == -1:
     directory = directory + "/*"
@@ -905,49 +904,15 @@ assert (all(mask))
 
 synthetic_data_sets = recover_synthetic_datasets(sample_indices)
 
-def calculate_recovered_scores(synthetic_data_sets, F_tilde_x):
-    
-    F_tilde_rs = []
-    
-    for synthethic_data_set in synthetic_data_sets:
-        F_tilde_rs.append(testutilities.get_synthetic_F_tilde(synthethic_data_set,dim))
-        
-    F_tilde_rs = np.array(F_tilde_rs)
-
-    utilities_array = - scaling_const*np.max(np.abs(F_tilde_x - F_tilde_rs),axis=(2,1))
-    
-    scores_array = np.exp(utilities_array - max_score)
-    
-    return (scores_array, utilities_array)
-
-calculated_scores, calculated_scaled_utilities = calculate_recovered_scores(synthetic_data_sets, F_tilde_x)
+# Recalculate scores and utilities based on the recovered synthetic data sets
+calculated_scores, calculated_scaled_utilities = testutilities.calculate_recovered_scores(synthetic_data_sets, F_tilde_x, scaling_const, max_score, dim)
 
 samples_utilities = - (1/scaling_const)*calculated_scaled_utilities
 
 print("Samples utilities",samples_utilities)
 
 # Retrieve the scores from the raw results
+look_up_scores = testutilities.retrieve_scores_from_results(results,sample_indices, max_score)        
 
-def retrieve_scores_from_results(results,sample_indices):
-    
-    scores = []
-    
-    batch_idxs = [element[0] for element in sample_indices]
-    row_idxs = [element[1] for element in sample_indices]
-    col_idxs = [element[2] for element in sample_indices]
-    
-    # Remember that max_score has not been subtracted from each result and 
-    # that exp was not taken
-    
-    score_results = [(element[0], np.exp(element[1] - max_score)) for element in results ]
-    
-    for batch_idx, row_idx, col_idx in zip(batch_idxs, row_idxs, col_idxs):
-        scores.append(score_results[batch_idx][1][row_idx,col_idx])
-    
-    return scores
-
-look_up_scores = retrieve_scores_from_results(results,sample_indices)        
-        
-trouble_file = 'C:/Users/alexc/OneDrive/Documents/GitHub/Thesis/Experiments/test_struct_integrity/OutcomeSpace' + '/s_eps01d2_38'
-
-reloaded_data = load_batch_scores(trouble_file)
+# Compare retrieved and calculated scores
+assert  np.all(np.isclose(np.array(calculated_scores),np.array(look_up_scores),rtol = rtol))
