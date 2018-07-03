@@ -5,7 +5,8 @@ Created on Mon Jul  2 11:18:23 2018
 @author: alexc
 """
 
-import pickle
+import pickle, os
+import numpy as np
 
 class FileManager(object):
     
@@ -37,5 +38,45 @@ class FileManager(object):
                 data.append(self.load_batch_scores(filename))
         else:
             for entry in batches:
-                data.append(self.load_batch_scores(filenames[entry]))
+                try:
+                    data.append(self.load_batch_scores(filenames[entry]))
+                except IndexError:
+                    print ("Attempted to access filename of index", entry)
         return data
+    
+    def save_synthetic_data(self, data, directory, filename):
+        
+        directory = directory.replace(os.path.basename(directory),'SyntheticData') 
+        
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        
+        fullpath = directory + "/" + filename
+        
+        if os.path.exists(fullpath):
+            rand_int = np.random.choice(range(1000000))
+            fullpath = fullpath + "_" + str(rand_int)
+
+       
+        with open(fullpath,"wb") as container:
+            pickle.dump(data, container)
+            
+    def load_lattice(self,path):
+        ''' Returns the contents of the file specified by absolute path '''
+        with open(path,"rb") as data:
+            lattice = pickle.load(data)
+        return lattice
+        
+    def save_lattice(self, folder_path, lattice_name):
+        ''' Saves the lattice to the location specified by @folder_name with
+        the name specified by @lattice_name.'''
+        
+        if not os.path.exists(folder_path):
+            os.mkdir(folder_path)
+            
+        full_path = folder_path + "/" + lattice_name
+       
+        # Raise an error if the target file exists
+        if os.path.exists(full_path):
+            assert False
+    

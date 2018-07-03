@@ -13,13 +13,14 @@ import os, pickle, glob
 from scipy.special import comb, factorial
 import utility_functions
 import functools
+import time
 from netmechanism_helpers import FileManager
 
 from multiprocessing import Pool
 import multiprocessing.util as util
 util.log_to_stderr(util.SUBDEBUG)
 
-class FeaturesLattice():
+class FeaturesLattice(FileManager):
     
     '''A FeaturesLattice object contains, in the @points property, all vectors with 
     norm less than @radius of dimensionality @dim. The coordinates of the vectors lie on a lattice
@@ -30,32 +31,17 @@ class FeaturesLattice():
         self.dim = 2 
         self.radius = 1
         self.points = []
-
-    def save_lattice(self,folder_path,lattice_name):
-        ''' Saves the lattice to the location specified by @folder_name with
-        the name specified by @lattice_name.'''
-        
-        if not os.path.exists(folder_path):
-            os.mkdir(folder_path)
-            
-        full_path = folder_path+"/"+lattice_name
-       
-        # Raise an error if the target file exists
-        if os.path.exists(full_path):
-            assert False
-           
-        with open(full_path,"wb") as data:
-            pickle.dump(self.points,data)
+        super(FeaturesLattice, self).__init__()
     
     def ordered_recursion(self,pos_lattice_coord, radius, dim,upper_bound):
         ''' This function recursively determines all ordered solutions of dimension d
         (x_1,x_2,...,x_d) where s.t. x_i <= upper_bound for all i in [d]. The ordering chosen is x_1>=x_2>=...>=x_d)'''
         partial_solutions = []
-        for coordinate in reversed([entry for entry in pos_lattice_coord if entry <=upper_bound]):
+        for coordinate in reversed([entry for entry in pos_lattice_coord if entry <= upper_bound]):
             if dim == 1:
                 partial_solutions.append([coordinate])
             else:
-                for point in self.ordered_recursion(pos_lattice_coord,radius,dim-1,upper_bound): 
+                for point in self.ordered_recursion(pos_lattice_coord, radius, dim - 1, upper_bound): 
                     
                     # Ensures the ordering is satisfied
                     if coordinate <= point[-1]:# or math.isclose(coordinate,point[-1],rel_tol=rel_tol): 
@@ -68,7 +54,7 @@ class FeaturesLattice():
         #  , then there will not be any solution!                    
         return partial_solutions
     
-    def main_recursion(self,radius,dim,pos_lattice_coord,lb,ub,x_prev,max_dim):
+    def main_recursion(self, radius, dim, pos_lattice_coord, lb, ub, x_prev, max_dim):
         
         # Determine the range of the variable currently being recursed on. If dim == max_dim
         # then x is x_1. Otherwise x is x_2 (if dim==max_dim-1) and so on.... These are the points inside
@@ -80,7 +66,7 @@ class FeaturesLattice():
             # of the remaining coordinates
             if radius**2 < x**2: 
                 # For numerical stability, the cases where the points are close to the sphere are handled separately
-                if math.isclose(radius**2,x**2,rel_tol=self.rel_tol):
+                if math.isclose(radius**2,x**2,rel_tol = self.rel_tol):
                     radius = 0.0
                     lb = 0.0
                     ub = x
@@ -92,34 +78,34 @@ class FeaturesLattice():
                 else:
                     continue
             else:
-                radius = math.sqrt(radius**2- x**2)
-                lb = math.sqrt(radius**2/(dim-1))
+                radius = math.sqrt(radius**2 - x**2)
+                lb = math.sqrt(radius**2/(dim - 1))
                 ub = x
                 x_prev.append(x)
             if dim == 1: 
                 if len(x_prev) == max_dim:
-                    assert math.isclose(np.linalg.norm(x_prev,ord=2),1.0,rel_tol=self.rel_tol)
+                    assert math.isclose(np.linalg.norm(x_prev,ord = 2),1.0,rel_tol = self.rel_tol)
                     self.points.append(x_prev)
             else:
                 # Recursive call to solve a lower dimensional problem, with updated radius and dimension
-                self.main_recursion(radius,dim-1,pos_lattice_coord,lb,ub,x_prev,max_dim)
+                self.main_recursion(radius, dim - 1, pos_lattice_coord, lb, ub, x_prev, max_dim)
                 
                 # Recover solutions in dim-1 that satisfy Procedure 1 (see, Algorithm TBD, report)
-                low_d_soln = self.ordered_recursion(pos_lattice_coord,radius,dim-1,lb)
+                low_d_soln = self.ordered_recursion(pos_lattice_coord, radius, dim - 1, lb)
                 
                 # Search for lower dimensional solutions given the coordinates fixed so far
                 if low_d_soln:
                     for partial_soln in low_d_soln:
-                        candidate = x_prev[0:max_dim-(dim-1)]+partial_soln
-                        assert math.isclose(np.linalg.norm(candidate,ord=2),1.0,rel_tol=self.rel_tol) or (np.linalg.norm(candidate,ord=2) <= 1.0)
+                        candidate = x_prev[0:max_dim-(dim-1)] + partial_soln
+                        assert math.isclose(np.linalg.norm(candidate,ord = 2),1.0,rel_tol = self.rel_tol) or (np.linalg.norm(candidate,ord=2) <= 1.0)
                         self.points.append(candidate)
                         
                 # Update the radius and bounds after performing the computations for a particular dim.
                 # so that they have the correct values when computing solutions up the recursion stack,
                 # in higher dimensions
-                radius = math.sqrt(radius**2+x**2)
-                x_prev = x_prev[:(max_dim-dim)]
-                lb=math.sqrt(radius/dim)
+                radius = math.sqrt(radius**2 + x**2)
+                x_prev = x_prev[:(max_dim - dim)]
+                lb = math.sqrt(radius/dim)
                 ub = radius
     
     def generate_permuted_solutions(self,points):
@@ -158,11 +144,11 @@ class FeaturesLattice():
                 zero_indices = [i for i,e in enumerate(point) if e == 0.0]
                 
                 # Generate sign combinations for all the non_zero elements
-                temp_sign_list = generate_signs(dim-len(zero_indices))
+                temp_sign_list = generate_signs(dim - len(zero_indices))
                 
                 # Generate the signed solutions as vectors that do not include zero elements
                 for sign_combination in temp_sign_list:
-                    temp.append([-x if y == 0 else x*y for x,y in zip([entry for entry in point if entry != 0.0],sign_combination)])
+                    temp.append([-x if y == 0 else x*y for x,y in zip([entry for entry in point if entry != 0.0], sign_combination)])
                 
                 # Reinsert the zeros back into the array to obtain the correct solution
                 # TODO: Could we do this more efficiently, just with one list comprehension?
@@ -173,11 +159,10 @@ class FeaturesLattice():
             else:
                 # The signs combination is represented as a binary number where 0 is - and 1 is + 
                 for sign_combination in signs_list:
-                    solutions.append([-x if y == 0 else x*y for x,y in zip(point,sign_combination)])
+                    solutions.append([-x if y == 0 else x*y for x,y in zip(point, sign_combination)])
         return solutions    
-        
     
-    def generate_l2_lattice(self,dim=2,radius=1,lower_bound=-1,upper_bound=1,num_points=5,pos_ord=True,rel_tol=1e-06):
+    def generate_l2_lattice(self, dim = 2, radius = 1, lower_bound = -1, upper_bound = 1, num_points = 5, pos_ord = True, rel_tol = 1e-06):
         """ Generates a lattice inside the dim-dimensional hypersphere of radius @radius. The lattice is symmetric and its 
         coordinates are in the interval [-@lower_bound,@upper_bound]. The [-@lower_bound,@upper_bound] is discretised in to 
         @num_points (including the edges). If @pos_ord is True, then all the permutations and signed solutions derived from the 
@@ -187,16 +172,16 @@ class FeaturesLattice():
         self.rel_tol = rel_tol
         
         # Find lattice coordinates
-        full_lattice_coord = np.linspace(lower_bound,upper_bound,num=num_points,endpoint=True) # Removed precision
+        full_lattice_coord = np.linspace(lower_bound, upper_bound, num=num_points, endpoint = True) # Removed precision
         
         # Extract positive coordinates
         pos_lattice_coord = list(full_lattice_coord[full_lattice_coord >= 0.0])
         
         # Compute all the solutions with all fixed x_1 > sqrt(r^2/d)
         # self.points.extend(self.main_recursion(radius,dim,pos_lattice_coord,lb=math.sqrt(radius/dim),ub=radius,x_prev = [],max_dim=dim))
-        self.main_recursion(radius,dim,pos_lattice_coord,lb=math.sqrt(radius/dim),ub=radius,x_prev=[],max_dim=dim)
+        self.main_recursion(radius, dim, pos_lattice_coord, lb = math.sqrt(radius/dim) ,ub = radius, x_prev = [], max_dim = dim)
         # Compute all d-dimensional solutions with x1>=x2>=....>=xd and x_i <= sqrt(r^2/d) for all i \in d
-        self.points.extend(self.ordered_recursion(pos_lattice_coord,radius,dim,math.sqrt(radius/dim)))
+        self.points.extend(self.ordered_recursion(pos_lattice_coord, radius, dim, math.sqrt(radius/dim)))
         
         # Generate signed and permuted solutions
         if pos_ord:
@@ -210,7 +195,7 @@ class FeaturesLattice():
         # TODO: I think a slight improvement could be made if I remeoved the reversed() in line 49 and used break instead of continue - would this
         # work correctly or would affect the recursion. Early versions of the algo had break but didn't work.
 
-class TargetsLattice():
+class TargetsLattice(FileManager):
     
     '''A TargetsLattice object contains all vectors of dimension d, whose individual 
     entries are chosen from a discrete set of num_points points defined on the closed
@@ -219,22 +204,7 @@ class TargetsLattice():
     
     def __init__(self):
         self.points = []
-        
-    def save_lattice(self,folder_path,lattice_name):
-        ''' Saves the lattice to the location specified by @folder_name with
-        the name specified by @lattice_name.'''
-        
-        if not os.path.exists(folder_path):
-            os.mkdir(folder_path)
-            
-        full_path = folder_path+"/"+lattice_name
-       
-        # Raise an error if the target file exists
-        if os.path.exists(full_path):
-            assert False
-           
-        with open(full_path,"wb") as data:
-            pickle.dump(self.points,data)
+        super(TargetsLattice, self).__init__()   
     
     def generate_lattice(self,dim=2,lower_bound=-1,upper_bound=1,num_points=5):
         ''' Generates the lattice coordinate vector, the combinations of d points and their permuations. '''
@@ -273,14 +243,16 @@ class OutcomeSpaceGenerator(FileManager):
                  workers = 1, partition_method = 'fast'):
         ''' @ parallel: specifies whether the calculations of the outcome space scores is to be 
             performed in parallel or not
-            @ partition_method: Specifies which implementation is to be used to calculate the partition function'''
+            @ partition_method: Specifies which implementation is to be used to calculate the partition function
+            @ workers: specifies how many parallel processes are create to generate the outcome space. If set to -1
+            the number defaults to os.cpu_count()'''
        
         # Initialise FileManager class
         super(OutcomeSpaceGenerator, self).__init__()
         
         # Determines whether execution happens in parllel or not
         self.parallel = parallel
-        self.workers = workers
+        self.workers = workers # Set to -1 to take all available cores
         self.partition_method = partition_method
         
         # User defined properties/ inputs
@@ -308,6 +280,14 @@ class OutcomeSpaceGenerator(FileManager):
         self.batch_results = [] # Stores the max_score and the matrix containing the scores for that batch
         self.partition_function = 0
         self.max_scaled_utility = 0
+    
+    def get_last_batch_id(self):
+        filenames = glob.glob(self.directory + "/*")
+        def get_batch_id(filename):
+            return int(filename[filename.rfind("_") + 1:])
+    
+        filenames  = sorted(filenames, key = get_batch_id)
+        return get_batch_id(filenames[-1])
         
         
     def get_private_F_tilde (self, private_data):
@@ -389,8 +369,10 @@ class OutcomeSpaceGenerator(FileManager):
         # WARNING: Returning max_scaled_util is used for exp-normalise trick. score_batch allows
         # one to calculate the partition function fast but might cause memory errors
         # if many large batches are returned. 
-        
-        return (max_scaled_util,scaled_utilities_batch)
+        if self.partition_method == 'slow':
+            return (max_scaled_util)
+        else:
+            return (max_scaled_util, scaled_utilities_batch)
     
     def calculate_partition_function(self, results = [], partition_method = 'fast'):
         ''' Calculates the partition function. If @method is 'fast' then the partition function is 
@@ -411,13 +393,13 @@ class OutcomeSpaceGenerator(FileManager):
         def func(iterable, max_scaled_utility):
             ''' Helper function that calculates the partition function given an iterable
             @iterable which contains tuples of the form (scaled_utilities_batch, max_batch_scaled_util).''' 
-            return np.sum(np.exp(iterable[1]-max_scaled_utility))
+            return np.sum(np.exp(iterable[1] - max_scaled_utility))
         
         if partition_method == 'slow':
             
             # Raise an error if max_scaled utility is positive. Default is positive to that
             # an error is raised if the utility is not calculated and the method is set to 'slow'
-            if self.max_scaled_utility > 0:
+            if self.max_scaled_utility >= 0.0:
                 raise ValueError ("Maximum scaled utility incorrectly calculated!")
             if not self.filenames:
                 raise RuntimeError ("Expected a list of filenames to load the scaled utilities!")
@@ -466,7 +448,13 @@ class OutcomeSpaceGenerator(FileManager):
             
             print ("Partition function is", str(partition_function))
             print ("Max_scaled_utility is", max_scaled_utility)
-        
+     
+     
+    def calculate_max_scaled_utility(self, results):
+        max_scaled_utility = functools.reduce((lambda x,y:max(x,y)),results)
+        self.max_scaled_utility = max_scaled_utility
+        print ("Max_scaled_utility is", max_scaled_utility)
+    
     def generate_outcomes(self, experiment_name = '', synth_features = [], synth_targets = [],\
                           private_data = [], property_preserved = 'second_moments', privacy_constant = 0.1):        
             
@@ -486,11 +474,11 @@ class OutcomeSpaceGenerator(FileManager):
         self.epsilon = privacy_constant
         self.dimensionality =  self.private_data.features.shape[1]   
         self.n_batches = math.ceil(comb(self.synth_features.shape[0],\
-                                        self.dimensionality, exact=True)/self.batch_size)
+                                        self.dimensionality, exact = True)/self.batch_size)
         self.F_tilde_x = self.get_private_F_tilde(private_data)
         
-        print("Number of batches is",self.n_batches)
-        
+        print("Number of batches is", self.n_batches)
+         
         if self.n_batches == 0:
             raise ValueError ("Number of batches cannot be 0!")
         
@@ -512,12 +500,7 @@ class OutcomeSpaceGenerator(FileManager):
                 self.calculate_partition_function(results = results, partition_method = self.partition_method)
             else:
                 # Calculate the maximum scaled utility for sum_exp trick
-                max_scaled_utility = - math.inf
-                for result in results:
-                    if result[0] > max_scaled_utility:
-                        max_scaled_utility = result[0]
-                self.max_scaled_utility = max_scaled_utility
-                print ("Max_scaled_utility is", max_scaled_utility)
+                self.calculate_max_scaled_utility(results)
                 self.calculate_partition_function(partition_method = self.partition_method)
         else:
             self.generate_outcomes_parallel()
@@ -526,16 +509,26 @@ class OutcomeSpaceGenerator(FileManager):
         # TODO: make sure filenames is set correctly so the Sampler still works 
         print("Number of batches is ", self.n_batches)
         print("Starting parallel pool")
+        if self.workers == -1:
+            self.workers = os.cpu_count()
         pool = Pool(self.workers)
-        results = pool.imap(self.evaluate_sample_score,range(self.n_batches))
-        pool.close() # prevent further tasks from being submitted to the pool. Once all tasks have been
-        # completed the worker processes will exit
-        pool.join() # wait for the worker processes to exit. One must call close() before using join()
+        try:
+            results = pool.imap(self.evaluate_sample_score,range(self.n_batches))
+            pool.close() # prevent further tasks from being submitted to the pool. Once all tasks have been
+            # completed the worker processes will exit
+            pool.join() # wait for the worker processes to exit. One must call close() before using join()
+        except MemoryError:
+            time.sleep(1)
+            last_batch = self.get_last_batch_id()
+            print ("Ran out of memory at batch", last_batch)
+#            further_results = pool.imap(self.evaluate_sample_score,range(last_batch,self.n_batches,1))
+#            pool.close()
+#            pool.join()
         print("Pool execution complete")
         self.filenames = glob.glob(self.directory + "/*")
+        self.calculate_max_scaled_utility(results)
         self.calculate_partition_function(results = results, partition_method = self.partition_method)
         
-    
 class Sampler(FileManager):
     def __init__(self, directory = '', filenames = [], num_samples = 5, n_batches = 0, partition_method = 'fast', seed = 23,\
                  samples_only = False,  sampling_parameters = {}):
@@ -748,7 +741,7 @@ class Sampler(FileManager):
         self.sample_datasets(self.n_batches, self.num_samples, self.filenames, self.partition_function)
         self.recover_synthetic_datasets(self.sample_indices)
         
-class SyntheticDataGenerator():
+class SyntheticDataGenerator(FileManager):
     
     def __init__(self, private_data, OutcomeSpace, Sampler = [], privacy_constant = 0.1, 
                  num_points_features = 8 , num_points_targets = 5 , \
@@ -766,7 +759,7 @@ class SyntheticDataGenerator():
             @ target_latt_path: path to the lattice from which the synthethic target
             vectors are drawn. If not specified a lattice is intiliased upon call 
             of the generate_data method '''
-        
+        super(SyntheticDataGenerator, self).__init__()
         # Synthetic data properties
         self.property_preserved = 'second_moments' # overwritten by the generate_data method
         self.epsilon = privacy_constant
@@ -831,12 +824,6 @@ class SyntheticDataGenerator():
                 print ("Synthethic target space initialised")
         else:
             self.synthetic_targets = self.load_lattice(self.target_latt_path)
-        
-    def load_lattice(self,path):
-        ''' Returns the contents of the file specified by absolute path '''
-        with open(path,"rb") as data:
-            lattice = pickle.load(data)
-        return lattice
 
     def generate_data(self, property_preserved):
         
@@ -862,7 +849,8 @@ class SyntheticDataGenerator():
         # Return sampled values
         self.sampling_parameters = self.sampler.sampling_parameters
         self.synthetic_datasets = self.sampler.sampled_data_sets
-        print ("The sampled datasets are",self.synthetic_datasets)
+        self.save_synthetic_data(self.synthetic_datasets, self.sampler.directory, experiment_name)
+        print ("The sampled datasets are", self.synthetic_datasets)
 
 def est_outcome_space_size(N,d,k):
     '''This function estimates the size of the outcome space as a function of:

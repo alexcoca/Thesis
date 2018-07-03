@@ -17,17 +17,17 @@ util.log_to_stderr(util.SUBDEBUG)
 if __name__ == '__main__':
     # Initialise private_data object
     # '__spec__' = None
-    dimensionality = 4
+    dimensionality = 2
     num_records = 20
     private_data = ContinuousGenerator(d = dimensionality, n = num_records)
     private_data.generate_data()
     
     # Initialise OutcomeSpaceGenerator()
-    batch_size = 15000
-    directory = 'C:/Users/alexc/OneDrive/Documents/GitHub/Thesis/Experiments/'
+    batch_size = 10
+    directory = 'D:/Thesis/Experiments'
     parallel = True
-    workers = 8 # number of worker processes
-    partition_method = 'fast'
+    workers = -1 # number of worker processes
+    partition_method = 'slow'
     OutcomeSpaceGenerator = OutcomeSpaceGenerator(directory = directory, batch_size = batch_size, parallel = parallel,\
                                                   workers = workers, partition_method = partition_method)
     
@@ -39,7 +39,7 @@ if __name__ == '__main__':
     
     # Initialise SyntheticDataGenerator() object 
     num_points_targets = 5 # Number of points for interval discretisation
-    num_points_features = 5 # Number of points for l2-lattice discretisation
+    num_points_features = 8 # Number of points for l2-lattice discretisation
     epsilon = 0.1
     SyntheticDataGenerator = SyntheticDataGenerator(private_data, OutcomeSpaceGenerator, Sampler = SamplerInstance,\
                                                      privacy_constant = epsilon, num_points_features = num_points_features,

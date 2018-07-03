@@ -257,3 +257,41 @@ def retrieve_scores_from_results(results,sample_indices,max_scaled_utility):
         scores.append(score_results[batch_idx][1][row_idx,col_idx])
     
     return scores
+
+def load_batch_scores(path):
+    ''' Returns the contents of the file specified by absolute path. 
+    
+    This is the baseline version used to test the netmechanism module.'''
+    with open(path, "rb") as data:
+        batch_scores = pickle.load(data)
+    return batch_scores
+
+def retrieve_scores(filenames, batches = []):
+    """ This function unpickles the files in specified in the 
+    filenames list, returning a list containing the contents of the unpickled files.
+    If if batches list is specified, then only the files to the corresponding
+    to entries of the list are loaded 
+    
+    This is the baseline version used to test the netmechanism module."""
+    
+    def get_batch_id(filename):
+        return int(filename[filename.rfind("_") + 1:])
+         
+    data = []
+    
+    # Filenames have to be sorted to ensure correct batch is extracted
+    filenames  = sorted(filenames, key = get_batch_id)
+    
+    if not batches:        
+        for filename in filenames:
+            data.append(load_batch_scores(filename))
+    else:
+        for entry in batches:
+            data.append(load_batch_scores(filenames[entry]))
+    return data
+
+def load_data(path):
+    ''' Returns the contents of the file specified by absolute path '''
+    with open(path,"rb") as container:
+        data = pickle.load(container)
+    return data

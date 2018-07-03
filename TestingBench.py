@@ -420,7 +420,7 @@ assert intersection_m2.shape[0] == len(test_points)
 
 
 #%%  Testing tensor manipulations
-from netmechanism import FeaturesLattice, TargetsLattice, est_outcome_space_size
+from netmechanism import FeaturesLattice, TargetsLattice
 import itertools, functools
 import numpy as np
 import math
@@ -443,11 +443,6 @@ def get_private_F_tilde (private_data):
     return F_tilde_x        
     
 # @profile
-def load_batch_scores(path):
-    ''' Returns the contents of the file specified by absolute path '''
-    with open(path,"rb") as data:
-        batch_scores = pickle.load(data)
-    return batch_scores
 
 def save_batch_scores(batch, filename, directory = '', overwrite = False):
     ''' Saves the batch of scores to the location specified by @directory with
@@ -484,29 +479,6 @@ def save_batch_scores(batch, filename, directory = '', overwrite = False):
         with open(full_path,"wb") as data:
             pickle.dump(batch,data)
 
-def retrieve_scores(filenames,batches=[]):
-    """ This function unpickles the files in @directory, returning a list
-    containing the contents of the unpickled files.
-    If if batches list is specified, then only the files to the corresponding
-    to entries of the list are loaded """
-    
-    
-    def get_batch_id(filename):
-        return int(filename[filename.rfind("_")+1:])
-        
-    data = []
-    
-    # Filenames have to be sorted to ensure correct batch is extracted
-    filenames  = sorted(filenames, key = get_batch_id)
-    
-    if not batches:        
-        for filename in filenames:
-            data.append(load_batch_scores(filename))
-    else:
-        for entry in batches:
-            data.append(load_batch_scores(filenames[entry]))
-    return data
-
 #@profile
 def calculate_partition_function(filenames,n_batches,test = False):
     
@@ -526,7 +498,7 @@ def calculate_partition_function(filenames,n_batches,test = False):
     partition_function  = 0
     
     for batch in range(n_batches):
-        data = retrieve_scores(filenames,[batch])[0]
+        data = testutilities.retrieve_scores(filenames,[batch])[0]
         
         if test:
             # Keep a copy of the original data to allow testing 
@@ -647,7 +619,7 @@ def sample_dataset(n_batches,num_samples,filenames):
         orig_partition = scaled_partition
         
         for batch in range(n_batches):
-            scores = retrieve_scores(filenames,batches=[batch])[0]['scores']
+            scores = testutilities.retrieve_scores(filenames,batches=[batch])[0]['scores']
             candidate = scaled_partition - np.sum(scores)
             if candidate > 0:
                 scaled_partition = candidate
@@ -775,7 +747,7 @@ if directory.rfind("*") == -1:
 # We pass filenames to the data loader to avoid calling glob.glob for every sampling step
 filenames = glob.glob(directory)
 
-reloaded_data = retrieve_scores(filenames)
+reloaded_data = testutilities.retrieve_scores(filenames)
 
 is_diff = []
 rtol = 1e-05
@@ -790,7 +762,7 @@ assert np.all(is_diff)
 
 batches = [0,1,2]
 
-reloaded_data_batches = retrieve_scores(filenames,batches)
+reloaded_data_batches = testutilities.retrieve_scores(filenames,batches)
 
 is_diff = []
 rtol = 1e-05
@@ -922,4 +894,40 @@ assert  np.all(np.isclose(np.array(calculated_scores),np.array(look_up_scores),r
 
 # To peform these tests, run second_moment_experiments_main.py with the same parameters
 
-assert  np.all(np.isclose(synthetic_data_integrated,synthetic_data_sets,rtol = rtol))
+# assert  np.all(np.isclose(synthetic_data_integrated,synthetic_data_sets,rtol = rtol))
+#%% # Test synthetic data saving
+#import testutilities
+#
+#path = 'D:/Thesis/Experiments/s_eps01d2nt5nf8/SyntheticData/s_eps01d2nt5nf8'
+#
+#data = testutilities.load_data(path)
+#%%
+# Investigate empty batches problem...
+import testutilities, glob
+
+def get_batch_id(filename):
+    return int(filename[filename.rfind("_") + 1:])
+
+
+
+experiment_name = 's_eps01d3nt10nf10'
+exp_directory = 'D:/Thesis/Experiments/' + experiment_name + '/OutcomeSpace'
+filenames = glob.glob(exp_directory + "/*")
+filenames  = sorted(filenames, key = get_batch_id)
+
+dir1= 'D:/Thesis/Experiments/s_eps01d3nt10nf10/OutcomeSpace/'
+dir2 = 'D:/Thesis/Experiments/s_eps01d3nt10nf10_shutdown/OutcomeSpace/'
+
+fname1 = 's_eps01d3nt10nf10_0'
+fname2 = 's_eps01d3nt10nf10_5'
+
+# Processed batches
+
+# Does the data in batch 0 correspond in both experiments
+
+
+
+loaded_data_1_1 = testutilities.retrieve_scores([dir1+fname1])
+loaded_data_2_1 = testutilities.retrieve_scores([dir2+fname1])
+# batch = 3
+ #data = testutilities.retrieve_scores(filenames,[batch])
