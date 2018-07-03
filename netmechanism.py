@@ -321,9 +321,9 @@ class OutcomeSpaceGenerator(FileManager):
                 if os.path.exists(full_path):
                     assert False
         else:
-            # Create directories if they don't exist
-            if not os.path.exists(directory):
-                os.makedirs(directory)
+#            # Create directories if they don't exist
+#            if not os.path.exists(directory):
+#                os.makedirs(directory)
                 
             full_path = directory + "/" + filename
            
@@ -362,6 +362,8 @@ class OutcomeSpaceGenerator(FileManager):
         # Max. utility is calculated in order to implement exp-normalise trick
         max_scaled_util = np.max(scaled_utilities_batch)
         
+        partial_sum = np.sum(np.exp(scaled_utilities_batch))
+        
         # Save scaled utilities to disk
         filename = self.experiment_name +  "_" + str(batch_index)
         self.save_batch(struct, filename, self.directory)
@@ -371,10 +373,17 @@ class OutcomeSpaceGenerator(FileManager):
         # if many large batches are returned. 
         if self.partition_method == 'slow':
             return (max_scaled_util)
-        else:
+        elif self.partition_method == 'fast':
             return (max_scaled_util, scaled_utilities_batch)
+        elif self.partition_method == 'fast_2': 
+            return partial_sum
     
-    def calculate_partition_function(self, results = [], partition_method = 'fast'):
+    def calculate_max_scaled_utility(self, results):
+        max_scaled_utility = functools.reduce((lambda x,y:max(x,y)),results)
+        self.max_scaled_utility = max_scaled_utility
+        print ("Max_scaled_utility is", max_scaled_utility)    
+    
+    def calculate_partition_function(self, results = [], partition_method = 'fast_2'):
         ''' Calculates the partition function. If @method is 'fast' then the partition function is 
         calculated from the iterable @results returned by the TBD method. If method is 'slow', then 
         the partition function is calculated by loading the data saved by the @evaluate_sample_score
@@ -396,6 +405,8 @@ class OutcomeSpaceGenerator(FileManager):
             return np.sum(np.exp(iterable[1] - max_scaled_utility))
         
         if partition_method == 'slow':
+            
+            self.calculate_max_scaled_utility(results)
             
             # Raise an error if max_scaled utility is positive. Default is positive to that
             # an error is raised if the utility is not calculated and the method is set to 'slow'
@@ -427,7 +438,7 @@ class OutcomeSpaceGenerator(FileManager):
             
             print ("Partition function is", str(partition_function))
                 
-        if partition_method == 'fast':
+        elif partition_method == 'fast':
             
             # Raise an error if the results stucture is not provided and the method  arg is set
             # to 'fast'
@@ -449,11 +460,12 @@ class OutcomeSpaceGenerator(FileManager):
             print ("Partition function is", str(partition_function))
             print ("Max_scaled_utility is", max_scaled_utility)
      
-     
-    def calculate_max_scaled_utility(self, results):
-        max_scaled_utility = functools.reduce((lambda x,y:max(x,y)),results)
-        self.max_scaled_utility = max_scaled_utility
-        print ("Max_scaled_utility is", max_scaled_utility)
+        elif partition_method == 'fast_2':
+            
+            partition_function = functools.reduce((lambda x,y: x + y), results)
+            self.partition_function = partition_function
+            print ("Partition function is", str(partition_function))
+            
     
     def generate_outcomes(self, experiment_name = '', synth_features = [], synth_targets = [],\
                           private_data = [], property_preserved = 'second_moments', privacy_constant = 0.1):        
@@ -461,6 +473,8 @@ class OutcomeSpaceGenerator(FileManager):
         # Set object properties
         self.experiment_name = experiment_name
         self.directory = self.directory + "/" + str(experiment_name) + "/OutcomeSpace"
+        if not os.path.exists(self.directory):
+            os.makedirs(self.directory)
         self.synth_features = synth_features
         self.synth_targets = synth_targets
         self.private_data = private_data
@@ -526,7 +540,6 @@ class OutcomeSpaceGenerator(FileManager):
 #            pool.join()
         print("Pool execution complete")
         self.filenames = glob.glob(self.directory + "/*")
-        self.calculate_max_scaled_utility(results)
         self.calculate_partition_function(results = results, partition_method = self.partition_method)
         
 class Sampler(FileManager):
