@@ -6,9 +6,9 @@ Created on Sun Jul  1 17:43:18 2018
 """
 
 from data_generators import ContinuousGenerator
-from netmechanism import OutcomeSpaceGenerator, Sampler
-from synthethic_data_generators import SyntheticDataGenerator
+from netmechanism import OutcomeSpaceGenerator, Sampler, SyntheticDataGenerator 
 import time
+
 # from multiprocessing import Pool, current_process 
 import multiprocessing.util as util
 util.log_to_stderr(util.SUBDEBUG)
@@ -26,7 +26,7 @@ if __name__ == '__main__':
     batch_size = 15000
     directory = 'C:/Users/alexc/OneDrive/Documents/GitHub/Thesis/Experiments/'
     parallel = True
-    workers = 8
+    workers = 8 # number of worker processes
     partition_method = 'fast'
     OutcomeSpaceGenerator = OutcomeSpaceGenerator(directory = directory, batch_size = batch_size, parallel = parallel,\
                                                   workers = workers, partition_method = partition_method)
@@ -38,8 +38,8 @@ if __name__ == '__main__':
     SamplerInstance = Sampler(num_samples = num_samples, seed = seed, partition_method = partition_method, samples_only = samples_only)
     
     # Initialise SyntheticDataGenerator() object 
-    num_points_targets = 5
-    num_points_features = 5
+    num_points_targets = 5 # Number of points for interval discretisation
+    num_points_features = 5 # Number of points for l2-lattice discretisation
     epsilon = 0.1
     SyntheticDataGenerator = SyntheticDataGenerator(private_data, OutcomeSpaceGenerator, Sampler = SamplerInstance,\
                                                      privacy_constant = epsilon, num_points_features = num_points_features,
