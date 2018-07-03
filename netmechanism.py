@@ -322,15 +322,16 @@ class OutcomeSpaceGenerator(FileManager):
                     assert False
         else:
             # Create directories if they don't exist
-            if not os.path.exists(directory):
-                os.makedirs(directory)
+#            if not os.path.exists(directory):
+#                print ("Directory does not exist")
+#                os.makedirs(directory)
                 
             full_path = directory + "/" + filename
            
             # Raise an error if the target file exists
             if os.path.exists(full_path):
                     raise IOError ("File already exists, delete before continuing!")
-               
+#            print("Directory", directory)
             with open(full_path,"wb") as data:
                 pickle.dump(batch, data)
                               
@@ -379,7 +380,6 @@ class OutcomeSpaceGenerator(FileManager):
         calculated from the iterable @results returned by the TBD method. If method is 'slow', then 
         the partition function is calculated by loading the data saved by the @evaluate_sample_score
         method during utility calculation.
-        
         Notes: If @method is set to 'slow', then each of the scaled utility matrices saved on the disk is
         transformed by subtracting the @max_scaled_utility (sum-exp trick) and taking the element-wise
         matrix eponential, in preparation for the sampling step. This is NOT the case if the fast calculation
@@ -461,6 +461,9 @@ class OutcomeSpaceGenerator(FileManager):
         # Set object properties
         self.experiment_name = experiment_name
         self.directory = self.directory + "/" + str(experiment_name) + "/OutcomeSpace"
+        if not os.path.exists(self.directory):
+                print ("Directory does not exist")
+                os.makedirs(self.directory)
         self.synth_features = synth_features
         self.synth_targets = synth_targets
         self.private_data = private_data

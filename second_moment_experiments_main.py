@@ -24,7 +24,7 @@ if __name__ == '__main__':
     
     # Initialise OutcomeSpaceGenerator()
     batch_size = 10
-    directory = 'D:/Thesis/Experiments'
+    directory = '/homes/ac2123/Thesis/Experiments'
     parallel = True
     workers = -1 # number of worker processes
     partition_method = 'slow'
