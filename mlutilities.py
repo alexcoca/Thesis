@@ -23,7 +23,7 @@ def find_nearest_element(array,value):
         return array[idx]
     
 def find_nearest_index(array,value):
-    ''' Find the index of the closest element to a value in a 1D numpy array 
+    ''' This tells us where should we insert the number so the array stays sorted
     WARNING: NOT TESTTED'''
 
     idx = np.searchsorted(array,value,side="left")

@@ -89,38 +89,38 @@ import testutilities
 import numpy as np
 import math
 
-dim = 4
-num_points = 5
+dim = 10
+num_points = 3
 upper_bound = 1.0
 lower_bound = -1.0
-num_dec = 10
+num_dec = 4
 radius = 1.0
 r_tol = 1e-5
 OutputLattice = FeaturesLattice()
 OutputLattice.generate_l2_lattice(dim=dim,radius=radius,lower_bound=lower_bound,upper_bound=upper_bound,num_points=num_points,pos_ord=True,rel_tol=r_tol)
 intersection_m2 = testutilities.bruteNonIntegerIntersection(dim=dim,radius=radius,num_points=num_points,lower_bound=lower_bound,upper_bound=upper_bound,filtered = False,r_tol=r_tol)
 test_points = OutputLattice.points
-# Points that are returned by the fancy algorithm but not by brute
-differences_1 = testutilities.get_differences(test_points,intersection_m2)
-assert differences_1.size == 0
-# Points that are returned by the brute but not the fancy algorithm
-differences_2 = testutilities.get_differences(intersection_m2,test_points)
-assert differences_2.size == 0
-# Test that all the solutions have the correct length
-lengths = [len(x) == dim for x in test_points]
-assert np.all(lengths)
-# Test that all the solutions are unique
-assert np.unique(test_points,axis=0).shape[0] == test_points.shape[0]
-# Test that the norms of the elements returned are correct
-norms = np.linalg.norm(np.array(test_points),ord=2,axis=1)
-close_norms = [True if math.isclose(np.linalg.norm(x),1,rel_tol=1e-7) == True else False for x in norms]
-small_norms = list(np.round(norms,decimals=num_dec) <=radius)
-all_norms = [x or y for x,y in zip(small_norms,close_norms)]
-# incorrect_points = np.array(test_points)[np.logical_not(all_norms)]
-incorrect_points = [point for (indicator,point) in zip(np.logical_not(all_norms),test_points) if indicator==True]
-assert np.all(all_norms)
-# Test that the two methods return the same number of solutions
-assert intersection_m2.shape[0] == len(test_points)
+## Points that are returned by the fancy algorithm but not by brute
+#differences_1 = testutilities.get_differences(test_points,intersection_m2)
+#assert differences_1.size == 0
+## Points that are returned by the brute but not the fancy algorithm
+#differences_2 = testutilities.get_differences(intersection_m2,test_points)
+#assert differences_2.size == 0
+## Test that all the solutions have the correct length
+#lengths = [len(x) == dim for x in test_points]
+#assert np.all(lengths)
+## Test that all the solutions are unique
+#assert np.unique(test_points,axis=0).shape[0] == test_points.shape[0]
+## Test that the norms of the elements returned are correct
+#norms = np.linalg.norm(np.array(test_points),ord=2,axis=1)
+#close_norms = [True if math.isclose(np.linalg.norm(x),1,rel_tol=1e-7) == True else False for x in norms]
+#small_norms = list(np.round(norms,decimals=num_dec) <=radius)
+#all_norms = [x or y for x,y in zip(small_norms,close_norms)]
+## incorrect_points = np.array(test_points)[np.logical_not(all_norms)]
+#incorrect_points = [point for (indicator,point) in zip(np.logical_not(all_norms),test_points) if indicator==True]
+#assert np.all(all_norms)
+## Test that the two methods return the same number of solutions
+#assert intersection_m2.shape[0] == len(test_points)
 #%%  Testing TargetsLattice class
 #from netmechanism import TargetsLattice
 #from scipy.special import comb,factorial 
@@ -429,7 +429,8 @@ from data_generators import ContinuousGenerator
 import time
 import pickle,os, glob
 import testutilities
-    
+
+
 def get_private_F_tilde (private_data):
     
     # Compute F_tilde (equation (4.1), Chapter 4, Section 4.1.1)
@@ -473,25 +474,25 @@ def save_batch_scores(batch, filename, directory = '', overwrite = False):
         full_path = directory+"/"+filename
        
         # Raise an error if the target file exists
-        if os.path.exists(full_path):
-                assert False
+#        if os.path.exists(full_path):
+#                assert False
            
         with open(full_path,"wb") as data:
             pickle.dump(batch,data)
 
 #@profile
-def calculate_partition_function(filenames,n_batches,test = False):
+def calculate_partition_function(filenames,n_batches,test = False, max_score = 0.0):
     
     def get_batch_id(filename):
         return int(filename[filename.rfind("_") + 1:])
     
     filenames = sorted(filenames, key = get_batch_id)
     
-    max_score = - math.inf
-
-    for result in iter(results):
-        if result[0] > max_score:
-            max_score = result[0]
+#    max_score = - math.inf
+#
+#    for result in iter(results):
+#        if result[0] > max_score:
+#            max_score = result[0]
     
     print ("Max score evaluated inside calculate_partition_function", max_score)
     
@@ -511,7 +512,7 @@ def calculate_partition_function(filenames,n_batches,test = False):
         
         # Overwrite the raw batch scores with the scores calculated as per 
         # Step 3 of the procedudre in Chapter 4, Section 4.1.3 
-        save_batch_scores(data,filenames[batch], overwrite = True)
+        save_batch_scores(data, filenames[batch], overwrite = True)
     
     return partition_function
 
@@ -564,12 +565,13 @@ def evaluate_sample_score(batch_index,test = False):
     filename = "/" + base_filename_s + "_" + str(batch_index)
     save_batch_scores(struct,filename,directory)
     
+    partial_sum = np.sum(np.exp(score_batch))
     # Only max_util is returned in the final version of the code to 
     # allow implementation of exp-normalise trick during sampling . 
     # score_batch is returned for testing purposes
     
-    return (max_util,score_batch)
-
+    return (max_util,score_batch, partial_sum)
+    
 def calculate_partition_function_alt(iterable):
     
     def func(scores_batch,max_score):
@@ -585,9 +587,9 @@ def calculate_partition_function_alt(iterable):
     
     return partition_function
 
-def sample_dataset(n_batches,num_samples,filenames):
+def sample_dataset(n_batches, num_samples, partition_function, filenames, seed):
     
-    np.random.seed(24)
+    np.random.seed(seed)
     
     def get_sample(scaled_partition):
         
@@ -595,41 +597,48 @@ def sample_dataset(n_batches,num_samples,filenames):
             
             row_idx = 0      
             col_idx = 0 
-
+            max_col_id = scores.shape[1] - 1
             cum_scores = np.sum(scores,axis=1)
             candidate_partition = scaled_partition
-            
+            print ("Calculating row and column, starting with partition", scaled_partition)
             while candidate_partition > 0:
                 candidate_partition = scaled_partition - cum_scores[row_idx]
                 if candidate_partition > 0:
                     scaled_partition = candidate_partition 
                     row_idx += 1
-            
+            print ("After rows contributions", scaled_partition)
             for element in scores[row_idx,:]:
                 scaled_partition -= element
                 if scaled_partition > 0:
-                    # print ("The value of the score is", element)
+                    print ("The value of the score is", element)
                     col_idx += 1
                 else:
+                    if col_idx == 0:
+                        col_idx = max_col_id
+                        row_idx = row_idx - 1
+                    else:
+                        col_idx = col_idx - 1
+                    print ("Final partition value is", scaled_partition)
                     break
             return (row_idx,col_idx)
         
         # Retrive the data for every batch and subtract from partition function
         
         orig_partition = scaled_partition
-        
+        print ("Starting from the scaled partition", scaled_partition)
         for batch in range(n_batches):
             scores = testutilities.retrieve_scores(filenames,batches=[batch])[0]['scores']
             candidate = scaled_partition - np.sum(scores)
             if candidate > 0:
                 scaled_partition = candidate
             else: 
+                print ("After batch contribution partition residual is", scaled_partition)
                 row_idx, col_idx = get_sample_idxs(scores,scaled_partition)
                 break
         return (batch, row_idx, col_idx, orig_partition)
    
     def get_batch_id(filename):
-        return int(filename[filename.rfind("_")+1:])
+        return int(filename[filename.rfind("_") + 1:])
         
     # Store sample indices
     sample_indices = []
@@ -646,7 +655,7 @@ def sample_dataset(n_batches,num_samples,filenames):
         # until the latter becomes negative. The data set for which this zero crossing is 
         # attained is the sampled value ( Step 6, Chapter 4, Section 4.1.3)
         sample_indices.append(get_sample(scaled_partition))
-    
+    print("Sampled indices, old algorithm with seed " + str(seed) + " are",sample_indices)
     return sample_indices
 
 def recover_synthetic_datasets(sample_indices):
@@ -695,7 +704,7 @@ utility_arrays = [] # Utility arrays
 dim = 2
 num_points_feat = 8
 num_points_targ = 5
-batch_size = 10
+batch_size = 500
 n_private = 20
 
 # Declare privacy paramters
@@ -722,7 +731,7 @@ igs = private_data.features.shape[0]/2
 scaling_const = igs*scaled_epsilon
 
 # Calculate number of batches
-n_batches = math.ceil(comb(features.shape[0],dim,exact=True)/batch_size)
+n_batches = math.ceil(comb(features.shape[0],dim,exact = True)/batch_size)
 
 # Define directory where the files will be saved
 experiment_name = 'test_struct_integrity'
@@ -760,20 +769,20 @@ assert np.all(is_diff)
 
 # Test reloading of only some batches - seems to work fine!
 
-batches = [0,1,2]
-
-reloaded_data_batches = testutilities.retrieve_scores(filenames,batches)
-
-is_diff = []
-rtol = 1e-05
-
-sliced_results = [results[x] for x in batches]
-
-for reloaded_element, returned_element in zip(reloaded_data_batches,sliced_results):
-    difference = reloaded_element['scores'] - returned_element[1]
-    is_diff.append(np.all(np.isclose(difference,np.zeros(shape=difference.shape),rtol=rtol)))
-
-assert np.all(is_diff)
+#batches = [0,1,2]
+#
+#reloaded_data_batches = testutilities.retrieve_scores(filenames,batches)
+#
+#is_diff = []
+#rtol = 1e-05
+#
+#sliced_results = [results[x] for x in batches]
+#
+#for reloaded_element, returned_element in zip(reloaded_data_batches,sliced_results):
+#    difference = reloaded_element['scores'] - returned_element[1]
+#    is_diff.append(np.all(np.isclose(difference,np.zeros(shape=difference.shape),rtol=rtol)))
+#
+#assert np.all(is_diff)
  
 # Calculating the partition function...
 
@@ -810,7 +819,7 @@ print ("Raw partition value",raw_partition_function)
 print ("Debug partition function value",debug_partition_function)
 
 # Calculate partition function (using sum_exp) 
-partition_function = calculate_partition_function(filenames, n_batches, test = False)
+partition_function = calculate_partition_function(filenames, n_batches, test = False, max_score = 0.0)
 
 print ("Sum-exp partition value",partition_function)
 
@@ -854,24 +863,28 @@ print ("Alternative method for calculating partition function gives", partition_
 
 # Now let's test the sampling procedure...
 
-num_samples = 5
+num_samples = 50
+seed = 23
 
-sample_indices = sample_dataset(n_batches, num_samples, filenames)
+sample_indices = sample_dataset(n_batches, num_samples, raw_partition_function, filenames, seed)
 
 # Use another method to calculate partition function given the output of the sampling function
             
-partition_residuals = testutilities.check_sampling(sample_indices,results,max_score)
+partition_residuals = testutilities.check_sampling(sample_indices, results, max_score = 0.0)
+print ("Partition residuals for the old method with seed " + str(seed) + " are:",partition_residuals)
 
 # Modify column indices and calculate residuals - they should be negative
 
 list_conversion = [list(element) for element in sample_indices]
 sample_indices_modified = [[batch_index, row_index, col_index + 1, part_function] for batch_index, row_index, col_index, part_function in list_conversion]
 
-partition_neg_residuals = testutilities.check_sampling(sample_indices_modified,results,max_score)    
+partition_neg_residuals = testutilities.check_sampling(sample_indices_modified, results, max_score = 0.0)    
+
+print ("Partition residuals for the old method with seed" + str(seed) + "are:", partition_neg_residuals)
 
 mask = [True if element <= 0 else False for element in partition_neg_residuals]
 
-assert (all(mask))
+# assert (all(mask))
 
 # And finally the matrix recovery procedure...   
 
@@ -880,17 +893,121 @@ synthetic_data_sets = recover_synthetic_datasets(sample_indices)
 print ("The data sets sampled are", synthetic_data_sets)
 
 # Recalculate scores and utilities based on the recovered synthetic data sets
-calculated_scores, calculated_scaled_utilities = testutilities.calculate_recovered_scores(synthetic_data_sets, F_tilde_x, scaling_const, max_score, dim)
+calculated_scores, calculated_scaled_utilities = testutilities.calculate_recovered_scores(synthetic_data_sets, F_tilde_x, scaling_const, dim)
 
 samples_utilities = - (1/scaling_const)*calculated_scaled_utilities
 
 print("Samples utilities",samples_utilities)
 
 # Retrieve the scores from the raw results
-look_up_scores = testutilities.retrieve_scores_from_results(results,sample_indices, max_score)        
+look_up_scores = testutilities.retrieve_scores_from_results(results, sample_indices, max_scaled_utility = 0.0)        
 
 # Compare retrieved and calculated scores
 assert  np.all(np.isclose(np.array(calculated_scores),np.array(look_up_scores),rtol = rtol))
+
+# New sampling methodology test
+
+def sample_datasets_new(num_samples, filenames, raw_partition_function, seed):
+    
+    def get_batch_id(filename):
+        return int(filename[filename.rfind("_") + 1:])
+    
+    def get_cumulative_partial_sums(results):
+        # Extract partial sums from results
+        partial_sums = [element[2] for element in results]
+        cumulative_sums = np.cumsum(partial_sums)
+        return cumulative_sums
+    
+    np.random.seed(seed)
+    sample_indices = []
+    
+    # Sort filenames to ensure correct access of stored data
+    filenames  = sorted(filenames, key = get_batch_id)
+    
+    # Scale partition function
+    scaled_partitions = raw_partition_function * np.random.random(size=(num_samples,))
+    orig_partitions = scaled_partitions
+    print ("Scaled partitions with seed " + str(seed) + " are for the new algorithm are", scaled_partitions)
+    # Obtain cumulative partition function - needs to be a numpy array in the actual implementation
+    cumulative_partitions = get_cumulative_partial_sums(results)
+    batches = np.searchsorted(cumulative_partitions, scaled_partitions).flatten()
+    
+    # If we were to move to the next matrix then we would get a negative score
+    assert np.all(scaled_partitions - cumulative_partitions[batches] < 0.0)
+    
+    # Adjust indices output to get the index for which the partition is still positive
+    #if not np.any(batches == 0):
+    
+    # Shrink partitions
+    # TODO: So if batch = 0 the partition remains unchanged
+    scaled_partitions[batches >= 1] = scaled_partitions[batches >= 1] - cumulative_partitions[batches[batches >= 1] - 1]
+        
+    # Expect to have positive scores
+    assert np.all(scaled_partitions >= 0.0) 
+    
+    # Create a dictionary with each batch as a separate key, to handle cases when 
+    # there are multiple samples from the same batch without loading the data twice
+    batch_dictionary = {}
+    
+    for key,value in zip(batches, scaled_partitions):
+        batch_dictionary.setdefault(key, []).append(value)
+        
+    # For each batch, load the data and calculate the row index
+    for key in batch_dictionary.keys():
+        scores = testutilities.retrieve_scores(filenames, batches= [key])[0]['scores']
+        max_row_idx = scores.shape[0] - 1
+        max_col_idx = scores.shape[1] - 1
+        # Calculate the cumulative scores
+        cum_scores = np.cumsum(np.sum(scores, axis=1))        
+        
+        # Find the rows in the score matrix
+        row_indices = np.searchsorted(cum_scores, batch_dictionary[key])
+        
+        # Rescale partitions to accound for the contribution of rows
+        partition_residuals = np.zeros(shape=(len(row_indices,)))
+        partition_residuals[row_indices >= 1] = np.array(batch_dictionary[key])[row_indices >= 1] - cum_scores[row_indices[row_indices >= 1] - 1]
+        if np.any(row_indices < 1):
+            partition_residuals[row_indices < 1] = np.array(batch_dictionary[key])[row_indices < 1]
+            
+        # Determine the column index for each partition residual in the corresponding row
+        col_indices = []
+        for i in range(len(row_indices)):
+            col_index = np.searchsorted(np.cumsum(scores[row_indices[i],:]), partition_residuals[i])
+            if  col_index > 0:
+                col_indices.append(col_index - 1)
+            else:
+                col_indices.append(max_col_idx)
+                row_indices[i] = row_indices[i] - 1
+
+        # Test that the column index calculation is correct
+        for row_index, col_index, partition_residual in zip(row_indices, col_indices, partition_residuals):
+            assert np.all(partition_residual - np.cumsum(scores[row_index,:])[col_index]) > 0
+            if col_index < max_col_idx:
+                assert np.all(partition_residual - np.cumsum(scores[row_index,:])[col_index + 1] < 0)
+            else:
+                assert np.all(partition_residual - np.cumsum(scores[row_index + 1][0]) < 0)
+        # Add index tuples to the list
+        for batch_idx, row_idx, col_idx in zip([key]*len(row_indices), row_indices, col_indices):
+            if int(row_idx == 0) and int(col_idx) == 0:
+                sample_indices(batch_idx - 1, max_row_idx, max_col_idx)
+            sample_indices.append((batch_idx, int(row_idx), int(col_idx),0))
+    
+    print ("Sampled indices returned by the new algorithm with seed " + str(seed) + " are", sample_indices)    
+    return (sample_indices,orig_partitions)
+
+seed = 23
+new_sample_indices,orig_partitions = sample_datasets_new(num_samples, filenames, raw_partition_function, seed)
+
+new_partition_residuals = testutilities.check_sampling(new_sample_indices, results,max_score = 0.0)
+
+print ("Partition subtracted for the new algorithm is", new_partition_residuals)
+
+list_conversion = [list(element) for element in new_sample_indices]
+new_sample_indices_modified = [[batch_index, row_index, col_index + 1, part_function] for batch_index, row_index, col_index, part_function in list_conversion]
+
+new_partition_check = testutilities.check_sampling(new_sample_indices_modified, results,max_score = 0.0)
+
+print ("Partition subtracted for the new algorithm is (check)", new_partition_check)
 
 # To peform these tests, run second_moment_experiments_main.py with the same parameters
 
@@ -923,9 +1040,7 @@ fname2 = 's_eps01d3nt10nf10_5'
 
 # Processed batches
 
-# Does the data in batch 0 correspond in both experiments
-
-
+# Does the data in batch 0 correspond in both experiment
 
 loaded_data_1_1 = testutilities.retrieve_scores([dir1+fname1])
 loaded_data_2_1 = testutilities.retrieve_scores([dir2+fname1])

@@ -169,7 +169,7 @@ def line_counter(path):
     # Create a (total_count,details) tuple
     return (sum(counts),list(zip(counts,names)))
 
-def check_sampling (sample_indices_set,results,max_score):
+def check_sampling (sample_indices_set, results, max_score):
     """ Given a set of sample indices, @sample_indices_set, represented as a tuple with
     structure (batch_index, row_index, column_index,scaled_partition_function), this function uses the raw algorithm 
     results to calculate the smallest postive "residual" of the partition function by subtracting
@@ -181,17 +181,21 @@ def check_sampling (sample_indices_set,results,max_score):
     the scores exactly"""
     
     partition_residuals = []
-        
+    
+    
     #for sample_indices in sample_indices_set:
     for batch, row_idx, col_idx, partition_function in sample_indices_set:
         
-        
+        print("Checking scaled partition", partition_function)
         if batch == 0:
             partition_residuals.append( partition_function - np.sum(np.exp(results[batch][1]-max_score).flatten()[0:((row_idx)*(results[batch][1].shape[1]) + col_idx)]) )
+            print ("Batch is 0, partition_residual", partition_residuals [-1])
         else:
             for index in range(batch):
                 partition_function = partition_function - np.sum(np.exp(results[index][1]-max_score))
-            partition_function = partition_function - np.sum( np.exp(results[batch][1]-max_score).flatten()[0:((row_idx)*(results[batch][1].shape[1]) + col_idx)] )
+            print ("After subtracting batch contribution", partition_function) 
+            partition_function = partition_function - np.sum( np.exp(results[batch][1] - max_score).flatten()[0:((row_idx)*(results[batch][1].shape[1]) + col_idx + 1)] )
+            print ("After subtracting rows and columns contribution", partition_function)
             partition_residuals.append(partition_function)  
         
     return partition_residuals
@@ -212,10 +216,11 @@ def get_synthetic_F_tilde(synthetic_data,dim):
     
     return F_tilde_r
 
-def calculate_recovered_scores(synthetic_data_sets, F_tilde_x, scaling_const, max_scaled_utility,dim):
+def calculate_recovered_scores(synthetic_data_sets, F_tilde_x, scaling_const, dim, max_scaled_utility = 0.0):
     ''' Given a set of @synthetic_data_sets, this function calculates the utilities 
     and scores for the private data set characterised by F_tilde_x. 
-    @ max_scaled_utility: Maximum value of scaled utility used to implement exp-normalise trick
+    @ max_scaled_utility: Maximum value of scaled utility used to implement exp-normalise trick. Set to 0.0
+    by default (exp-normalise not applied)
     @ scaling_constant: Equal to the inverse global sensitivity of the utility times half the 
     privacy parameter epsilon
     @ dim: dimensionality of the private data''' 
@@ -229,18 +234,19 @@ def calculate_recovered_scores(synthetic_data_sets, F_tilde_x, scaling_const, ma
     F_tilde_rs = np.array(F_tilde_rs)
 
     # Calculate utitlites
-    utilities_array = - scaling_const*np.max(np.abs(F_tilde_x - F_tilde_rs),axis=(2,1))
+    utilities_array = - scaling_const*np.max(np.abs(F_tilde_x - F_tilde_rs), axis = (2,1))
     
     # Calculate scores
     scores_array = np.exp(utilities_array - max_scaled_utility)
     
     return (scores_array, utilities_array)
 
-def retrieve_scores_from_results(results,sample_indices,max_scaled_utility):
+def retrieve_scores_from_results(results, sample_indices, max_scaled_utility = 0.0):
     ''' This test function is used to calculate the scores given 
     @results, a data structure containing tuples formed of scaled
     utility matrices for each batch [element at index 1] and the max.
-    scaled utility for that batch [element at index 0].'''
+    scaled utility for that batch [element at index 0]. If max_scaled_utility is
+    set to 0.0, exp-normalise trick is not applied.'''
     
     scores = []
     
@@ -295,3 +301,5 @@ def load_data(path):
     with open(path,"rb") as container:
         data = pickle.load(container)
     return data
+
+

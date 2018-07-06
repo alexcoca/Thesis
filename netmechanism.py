@@ -861,10 +861,13 @@ class SyntheticDataGenerator(FileManager):
         self.save_synthetic_data(self.synthetic_datasets, self.sampler.directory, experiment_name)
         print ("The sampled datasets are", self.synthetic_datasets)
 
-def est_outcome_space_size(N,d,k):
+def est_outcome_space_size(N,d,k, covariance_only = False):
     '''This function estimates the size of the outcome space as a function of:
         @ N: Total number of vectors inside the d-dimensional sphere
           d: private data dimensionality
           k: Number of points in which the target interval is discretised '''
-    return comb(N, d, exact = True)*comb(k, d, exact = True)*factorial(d, exact = True)#/10**7
+    if not covariance_only:
+        return comb(N, d, exact = True)*comb(k, d, exact = True)*factorial(d, exact = True)#/10**7
+    else:
+        return comb(N,d, exact = True)
 
