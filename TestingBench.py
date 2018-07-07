@@ -89,8 +89,8 @@ import testutilities
 import numpy as np
 import math
 
-dim = 10
-num_points = 3
+dim = 3
+num_points = 10
 upper_bound = 1.0
 lower_bound = -1.0
 num_dec = 4
@@ -701,10 +701,10 @@ def recover_synthetic_datasets(sample_indices):
 utility_arrays = [] # Utility arrays
 
 # Declare experiment parameters
-dim = 2
+dim = 3
 num_points_feat = 8
-num_points_targ = 5
-batch_size = 500
+num_points_targ = 6
+batch_size = 250
 n_private = 20
 
 # Declare privacy paramters
@@ -863,7 +863,7 @@ print ("Alternative method for calculating partition function gives", partition_
 
 # Now let's test the sampling procedure...
 
-num_samples = 50
+num_samples = 5
 seed = 23
 
 sample_indices = sample_dataset(n_batches, num_samples, raw_partition_function, filenames, seed)
@@ -926,11 +926,10 @@ def sample_datasets_new(num_samples, filenames, raw_partition_function, seed):
     
     # Scale partition function
     scaled_partitions = raw_partition_function * np.random.random(size=(num_samples,))
-    orig_partitions = scaled_partitions
     print ("Scaled partitions with seed " + str(seed) + " are for the new algorithm are", scaled_partitions)
     # Obtain cumulative partition function - needs to be a numpy array in the actual implementation
     cumulative_partitions = get_cumulative_partial_sums(results)
-    batches = np.searchsorted(cumulative_partitions, scaled_partitions).flatten()
+    batches = np.searchsorted(cumulative_partitions, scaled_partitions)
     
     # If we were to move to the next matrix then we would get a negative score
     assert np.all(scaled_partitions - cumulative_partitions[batches] < 0.0)
@@ -988,15 +987,15 @@ def sample_datasets_new(num_samples, filenames, raw_partition_function, seed):
                 assert np.all(partition_residual - np.cumsum(scores[row_index + 1][0]) < 0)
         # Add index tuples to the list
         for batch_idx, row_idx, col_idx in zip([key]*len(row_indices), row_indices, col_indices):
-            if int(row_idx == 0) and int(col_idx) == 0:
-                sample_indices(batch_idx - 1, max_row_idx, max_col_idx)
+            if int(row_idx) == 0 and int(col_idx) == 0:
+                sample_indices.append((batch_idx - 1, max_row_idx, max_col_idx,0))
             sample_indices.append((batch_idx, int(row_idx), int(col_idx),0))
     
     print ("Sampled indices returned by the new algorithm with seed " + str(seed) + " are", sample_indices)    
-    return (sample_indices,orig_partitions)
+    return sample_indices
 
 seed = 23
-new_sample_indices,orig_partitions = sample_datasets_new(num_samples, filenames, raw_partition_function, seed)
+new_sample_indices = sample_datasets_new(num_samples, filenames, raw_partition_function, seed)
 
 new_partition_residuals = testutilities.check_sampling(new_sample_indices, results,max_score = 0.0)
 

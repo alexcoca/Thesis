@@ -78,5 +78,21 @@ class FileManager(object):
        
         # Raise an error if the target file exists
         if os.path.exists(full_path):
-            assert False
+            raise FileExistsError("Lattice has already been saved!")
+        
+        raise NotImplementedError
+        
+    def save(self, data, path, filename):
+        
+        if not os.path.exists(path):
+            os.makedirs(path)
+            
+        fullpath =  path + "/" + filename     
+        
+        if os.path.exists(fullpath):
+            raise FileExistsError("Please delete or copy the old data!")
+            
+        with open(fullpath ,"wb") as container:
+            pickle.dump(data, container)
+        
     

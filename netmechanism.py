@@ -240,7 +240,7 @@ class OutcomeSpaceGenerator(FileManager):
     
     def __init__(self, directory = '', experiment = '', synth_features = [], synth_targets = [], private_data = [],\
                  property_preserved = 'second_moments', privacy_constant = 0.1, batch_size = 100, parallel = False,\
-                 workers = 1, partition_method = 'fast'):
+                 workers = 1, partition_method = 'fast', save_data = True):
         ''' @ parallel: specifies whether the calculations of the outcome space scores is to be 
             performed in parallel or not
             @ partition_method: Specifies which implementation is to be used to calculate the partition function
@@ -254,6 +254,7 @@ class OutcomeSpaceGenerator(FileManager):
         self.parallel = parallel
         self.workers = workers # Set to -1 to take all available cores
         self.partition_method = partition_method
+        self.save_data = save_data
         
         # User defined properties/ inputs
         self.directory = directory 
@@ -270,7 +271,6 @@ class OutcomeSpaceGenerator(FileManager):
         # Contains the filenames of scaled utilities on disk. Set by the 
         # generate_outcome and generate_outcomes_parallel methods
         self.filenames = [] 
-        
         self.n_batches = 0
     
         # Calculate private data utility
@@ -279,7 +279,11 @@ class OutcomeSpaceGenerator(FileManager):
         # Results storage    
         self.batch_results = [] # Stores the max_score and the matrix containing the scores for that batch
         self.partition_function = 0
+        self.cumlative_partition = []
         self.max_scaled_utility = 0
+        
+        #Miscellaneous
+        self.basename = ''
     
     def get_last_batch_id(self):
         filenames = glob.glob(self.directory + "/*")
@@ -288,7 +292,6 @@ class OutcomeSpaceGenerator(FileManager):
     
         filenames  = sorted(filenames, key = get_batch_id)
         return get_batch_id(filenames[-1])
-        
         
     def get_private_F_tilde (self, private_data):
         '''Compute F_tilde (equation (4.1), Chapter 4, Section 4.1.1)
@@ -335,17 +338,11 @@ class OutcomeSpaceGenerator(FileManager):
         
         if self.scaling_const == 0:
             raise ValueError("Scaling constant has not been calculated!")
-    
-        # Storage structure
-        struct = {}
-        
-        # Store the batch index to be able to retrieve the correct sample during sampling step
-        struct['batch_index'] = batch_index
         
         # Generate a batch of combinations according to the batch_index
         batch = itertools.islice(itertools.combinations(range(self.synth_features.shape[0]),self.dimensionality), \
                                      (batch_index)*self.batch_size,(batch_index+1)*self.batch_size)
-        
+
         # Evaluate utility - note that exponential is not taken as sum-exp trick is implemented to 
         # evalute the scores in a numerically stable way during the sampling stage
         if self.property_preserved == 'second_moments':
@@ -354,29 +351,38 @@ class OutcomeSpaceGenerator(FileManager):
         else:
             scaled_utilities_batch = utility_functions.compute_first_moment_utility(self.synth_targets, self.synth_features[list(batch),:],\
                                                                                      self.dimensionality, self.scaling_const, self.F_tilde_x)
-        struct ['scaled_utilities'] = scaled_utilities_batch
+        # Option to save the outcome space
+        if self.save_data:
+
+            # Storage structure
+            struct = {}
+            
+            # Store the batch index to be able to retrieve the correct sample during sampling step
+            struct['batch_index'] = batch_index
+            
+            struct ['scaled_utilities'] = scaled_utilities_batch
+            
+            # Save scaled utilities to disk
+            filename = self.experiment_name +  "_" + str(batch_index)
+            self.save_batch(struct, filename, self.directory)
         
         # Max. utility is calculated in order to implement exp-normalise trick
         max_scaled_util = np.max(scaled_utilities_batch)
         
         partial_sum = np.sum(np.exp(scaled_utilities_batch))
-        
-        # Save scaled utilities to disk
-        filename = self.experiment_name +  "_" + str(batch_index)
-        self.save_batch(struct, filename, self.directory)
-        
+
         # WARNING: Returning max_scaled_util is used for exp-normalise trick. score_batch allows
         # one to calculate the partition function fast but might cause memory errors
         # if many large batches are returned. 
         if self.partition_method == 'slow':
-            return (max_scaled_util)
+            return max_scaled_util
         elif self.partition_method == 'fast':
             return (max_scaled_util, scaled_utilities_batch)
         elif self.partition_method == 'fast_2': 
             return partial_sum
     
     def calculate_max_scaled_utility(self, results):
-        max_scaled_utility = functools.reduce((lambda x,y:max(x,y)),results)
+        max_scaled_utility = functools.reduce((lambda x,y: max(x, y)), results)
         self.max_scaled_utility = max_scaled_utility
         print ("Max_scaled_utility is", max_scaled_utility)    
     
@@ -402,15 +408,18 @@ class OutcomeSpaceGenerator(FileManager):
         
         if partition_method == 'slow':
             
-            self.calculate_max_scaled_utility(results)
-            
+            if not self.save_data:
+                raise RuntimeError("'slow' partition calculation method requires outcome space to be saved to disk. \
+                                   Please initialise OutcomeSpaceGenerator with save_data = True and re-run the experiment!")
             # Raise an error if max_scaled utility is positive. Default is positive to that
             # an error is raised if the utility is not calculated and the method is set to 'slow'
             if self.max_scaled_utility >= 0.0:
                 raise ValueError ("Maximum scaled utility incorrectly calculated!")
             if not self.filenames:
                 raise RuntimeError ("Expected a list of filenames to load the scaled utilities!")
-         
+            
+            self.calculate_max_scaled_utility(results)
+
             # Filenames sorted by batch_index to ensure correct files are accessed during 
             # reloading
             filenames = sorted(self.filenames, key = get_batch_id)
@@ -458,16 +467,16 @@ class OutcomeSpaceGenerator(FileManager):
      
         elif partition_method == 'fast_2':
             
-            partition_function = functools.reduce((lambda x,y: x + y), results)
-            self.partition_function = partition_function
-            print ("Partition function is", str(partition_function))
-            
-    
+            self.cumulative_partition = np.cumsum(list(results))
+            self.partition_function = self.cumulative_partition[-1]
+            print ("Partition function is", str(self.partition_function))
+
     def generate_outcomes(self, experiment_name = '', synth_features = [], synth_targets = [],\
                           private_data = [], property_preserved = 'second_moments', privacy_constant = 0.1):        
             
         # Set object properties
         self.experiment_name = experiment_name
+        self.basename = self.directory
         self.directory = self.directory + "/" + str(experiment_name) + "/OutcomeSpace"
         if not os.path.exists(self.directory):
             os.makedirs(self.directory)
@@ -506,7 +515,7 @@ class OutcomeSpaceGenerator(FileManager):
             
             # Compute the partition function 
             
-            if self.partition_method == 'fast':
+            if self.partition_method == 'fast' or self.partition_method == 'fast_2':
                 self.calculate_partition_function(results = results, partition_method = self.partition_method)
             else:
                 # Calculate the maximum scaled utility for sum_exp trick
@@ -535,12 +544,13 @@ class OutcomeSpaceGenerator(FileManager):
 #            pool.close()
 #            pool.join()
         print("Pool execution complete")
-        self.filenames = glob.glob(self.directory + "/*")
+        if self.save_data:
+            self.filenames = glob.glob(self.directory + "/*")
         self.calculate_partition_function(results = results, partition_method = self.partition_method)
         
 class Sampler(FileManager):
     def __init__(self, directory = '', filenames = [], num_samples = 5, n_batches = 0, partition_method = 'fast', seed = 23,\
-                 samples_only = False,  sampling_parameters = {}):
+                 samples_only = False, sample_parallel = False, load_data = False , sampling_parameters = {}):
         
         # Initialise FileManager class
         super(Sampler, self).__init__()
@@ -548,6 +558,9 @@ class Sampler(FileManager):
         # Properties that should be set explicitly during initialisation
         self.num_samples  = num_samples
         self.partition_method = partition_method
+        self.sample_parallel = sample_parallel
+        self.load_data = load_data
+        self.property_preserved = 'second_moments'
         
         # If more samples are required, the seed is changed so that different
         # samples are returned
@@ -569,6 +582,13 @@ class Sampler(FileManager):
         self.synth_features = []
         self.synth_targets = []
         self.dimensionality  = 2
+        self.F_tilde_x = 0
+        self.scaling_const = 0
+        self.partition_residuals = np.zeros(shape = (self.num_samples,))
+        self.basename = ''
+        self.experiment_name = ''
+        self.cumulative_partition = []
+        self.save_data = True
         
         # If the Sampler() is instanstiated just to draw more samples for a 
         # previous experiment, the sampling parameters are passed to the object
@@ -583,112 +603,133 @@ class Sampler(FileManager):
     def unpack_arguments(self):
         self.directory = self.sampling_parameters['directory']
         self.batch_size = self.sampling_parameters['batch_size']
-        self.n_batches = self.sampling_parameters['n_batches']
         self.partition_function = self.sampling_parameters['partition_function']
-        self.filenames = self.sampling_parameters['filenames']
+        self.cumulative_partition = self.sampling_parameters['cumulative_partition']
+        try: 
+            self.filenames = self.sampling_parameters['filenames']
+        except KeyError:
+            pass
         self.max_scaled_utility = self.sampling_parameters['max_scaled_utility']
         self.synth_features = self.sampling_parameters['synth_features']
         self.synth_targets = self.sampling_parameters['synth_targets']
         self.dimensionality  = self.sampling_parameters['dimensionality']
+        self.load_data = self.sampling_parameters['load_data']
+        self.F_tilde_x = self.sampling_parameters['F_tilde_x']
+        self.scaling_const = self.sampling_parameters['scaling_const']
+        self.experiment_name = self.sampling_parameters['experiment_name']
     
     def pack_arguments(self):
-        self.sampling_parameters = {'directory': self.directory,'batch_size': self.batch_size,'n_batches': self.n_batches,\
-                            'partition_function': self.partition_function, 'filenames': self.filenames,\
-                            'max_scaled_utility':self.max_scaled_utility, 'synth_features': self.synth_features,
-                            'synth_targets': self.synth_targets,'dimensionality': self.dimensionality}
+        self.sampling_parameters = {'directory': self.directory,'batch_size': self.batch_size,
+                                    'partition_function': self.partition_function, 'max_scaled_utility': self.max_scaled_utility, \
+                                    'synth_features': self.synth_features, 'synth_targets': self.synth_targets,\
+                                    'dimensionality': self.dimensionality, 'load_data':self.load_data, 'sampled_indices': self.sample_indices,\
+                                    'F_tilde_x': self.F_tilde_x, 'scaling_const': self.scaling_const, 'experiment_name': self.experiment_name, \
+                                    'cumulative_partition': self.cumulative_partition}
+        if self.load_data:
+            self.sampling_parameters['filenames'] =  self.filenames,
+        path = self.basename + "/" + self.experiment_name + "/SamplingLog/"
+        self.save(self.sampling_parameters, path, self.experiment_name)
         
-    def sample_datasets(self, n_batches, num_samples, filenames, partition_function):
-        ''' This method samples @num_samples data sets from the space generated by the
-        OutcomeSpaceGenerator object. The locations of the files containing unnormalized
-        probabilities (scores) of the outcomes are specified in the @filenames list. 
-        The partition function is calculated by the OutcomeSpaceGenerator.'''
+    def generate_batch(self, batch_index):
         
-        # Set random number generator for repeatablity 
-        np.random.seed(self.seed)
+        start = int(batch_index*self.batch_size)
+        stop =  int((batch_index + 1)*self.batch_size)
+        batch = itertools.islice(itertools.combinations(range(self.synth_features.shape[0]), self.dimensionality), start, stop)
         
-        def get_sample(scaled_partition):
-            ''' This function subtracts the batch cumulative scores from the 
-            (scaled) partition function until the partition function becomes negative. 
-            When this occurs, the batch index is stored and a call is made 
-            to the get_sample_idxs function to determine the entry in the matrix
-            that corresponds to the zero crossing of the scaled partition function.'''
-            
-            def get_sample_idxs(scores,scaled_partition):
-                ''' This function returns the row (row_idx) and column (col_idx)
-                index of the entry in the scores matrix for which the partition function
-                becomes negative'''
-                
-                row_idx = 0      
-                col_idx = 0 
-                
-                # Calculate cumulative scores for each batch
-                cum_scores = np.sum(scores, axis = 1)
-                candidate_partition = scaled_partition
-                
-                # Step 1: Subtract the batch cumulative scores until scaled partition function
-                # becomes negative. Remember the smallest positive value
-                while candidate_partition > 0:
-                    candidate_partition = scaled_partition - cum_scores[row_idx]
-                    if candidate_partition > 0:
-                        scaled_partition = candidate_partition 
-                        row_idx += 1
-                
-                # Subtract the entries of the row in which the partition function became
-                # negative at Step 1 from the smallest postive value, stopping when the
-                # scaled partion becomes negative
-                for element in scores[row_idx,:]:
-                    scaled_partition -= element
-                    if scaled_partition > 0:
-                        col_idx += 1
-                    else:
-                        break
-                return (row_idx,col_idx)
-            
-            # Retrive the saved scores and subtract from the scaled partition function 
-            # until it becomes negative. The data corresponding to the score for which
-            # this zero crossing occurs is the sampled data set
-            
-            orig_partition = scaled_partition
-            
-            for batch in range(n_batches):
-                
-                # For the 'slow' mode, the sum-exp trick and exponentiation have been applied
-                scores = self.retrieve_scores(filenames,batches=[batch])[0]['scaled_utilities']
-               
-                # Perform sum_exp trick and exponentiate if the fast method has been used for 
-                # partition calculations
-                if self.partition_method == 'fast':
-                    scores = np.exp(scores - self.max_scaled_utility)
-                    
-                candidate = scaled_partition - np.sum(scores)
-                if candidate > 0:
-                    scaled_partition = candidate
-                else: 
-                    row_idx, col_idx = get_sample_idxs(scores,scaled_partition)
-                    break
-            return (batch, row_idx, col_idx, orig_partition)
-       
+        if self.property_preserved == 'second_moments':
+            scaled_utilities_batch = utility_functions.compute_second_moment_utility(self.synth_targets, self.synth_features[list(batch),:],\
+                                                                                     self.dimensionality, self.scaling_const, self.F_tilde_x)
+        else:
+            scaled_utilities_batch = utility_functions.compute_first_moment_utility(self.synth_targets, self.synth_features[list(batch),:],\
+                                                                                     self.dimensionality, self.scaling_const, self.F_tilde_x)
+        
+        return scaled_utilities_batch
+    
+    def generate_batch_parallel(self):
+        pass
+    
+    
+    def sample_datasets(self, num_samples, filenames, raw_partition_function, cumulative_partition):
+        
         def get_batch_id(filename):
-            return int(filename[filename.rfind("_") + 1:])
-            
-        # Store sample indices
-        sample_indices = []
-         
-        # Filenames have to be sorted to ensure correct batch is extracted
+            return int(filename[filename.rfind("_") + 1: ])
+        
+        # Sort filenames to ensure correct access of stored data
         filenames  = sorted(filenames, key = get_batch_id)
         
-        for i in range(num_samples):
+        # Scale partition function
+        scaled_partitions = raw_partition_function * np.random.random(size=(num_samples,))
+        
+        # Obtain cumulative partition function - needs to be a numpy array in the actual implementation
+        batches = np.searchsorted(cumulative_partition, scaled_partitions)
+        
+        # Shrink partitions to account for the contribution of all previous batches
+        scaled_partitions[batches >= 1] = scaled_partitions[batches >= 1] - cumulative_partition[batches[batches >= 1] - 1]
+        
+        # This is necessary so that the matrix recovery proceducre can work in general
+        self.partition_residuals = scaled_partitions
+        
+        if not self.sample_parallel:
+        
+            sample_indices = []
             
-            # To sample, a random number in [0,1] is first generated and multiplied with the partition f
-            # (Step 5, in Chapter 4, Section 4.1.3)
-            scaled_partition = partition_function*np.random.random()
-            # To get a sample, the scores from each batch are subtracted from the scaled partition
-            # until the latter becomes negative. The data set for which this zero crossing is 
-            # attained is the sampled value ( Step 6, Chapter 4, Section 4.1.3)
-            sample_indices.append(get_sample(scaled_partition))
-    
-        self.sample_indices = sample_indices 
-
+            # Create a dictionary with each batch as a separate key, to handle cases when 
+            # there are multiple samples from the same batch without loading the data twice
+            batch_dictionary = {}
+            
+            for key,value in zip(batches, scaled_partitions):
+                batch_dictionary.setdefault(key, []).append(value)
+                
+            # For each batch, load the data and calculate the row index
+            for key in batch_dictionary.keys():
+                if self.load_data:
+                    if not self.save_data:
+                        raise RuntimeError("Cannot load data that has not be saved. Initialise OutcomeSpaceGenerator with \
+                                           save_data = True and then re-run the experiment!")
+                    scores = self.retrieve_scores(filenames, batches= [key])[0]['scaled_utilities']
+                    if not self.partition_method == 'slow':
+                        scores = np.exp(scores)
+                else:
+                    # Or alternatively regenerate the relevant part of the outcome space on the fly if the data 
+                    # has not been stored
+                    scores = np.exp(self.generate_batch(key))
+                    
+                max_row_idx = scores.shape[0] - 1
+                max_col_idx = scores.shape[1] - 1
+                # Calculate the cumulative scores
+                cum_scores = np.cumsum(np.sum(scores, axis=1))        
+                
+                # Find the rows in the score matrix
+                row_indices = np.searchsorted(cum_scores, batch_dictionary[key])
+                
+                # Rescale partitions to account for the contribution of rows
+                partition_residuals = np.zeros(shape=(len(row_indices,)))
+                partition_residuals[row_indices >= 1] = np.array(batch_dictionary[key])[row_indices >= 1] - \
+                                                        cum_scores[row_indices[row_indices >= 1] - 1]
+                if np.any(row_indices < 1):
+                    partition_residuals[row_indices < 1] = np.array(batch_dictionary[key])[row_indices < 1]
+                    
+                # Determine the column index for each partition residual in the corresponding row
+                col_indices = []
+                for i in range(len(row_indices)):
+                    col_index = np.searchsorted(np.cumsum(scores[row_indices[i],:]), partition_residuals[i])
+                    if  col_index > 0:
+                        col_indices.append(col_index - 1)
+                    else:
+                        col_indices.append(max_col_idx)
+                        row_indices[i] = row_indices[i] - 1
+                        
+                # Add index tuples to the samples list
+                for batch_idx, row_idx, col_idx in zip([key]*len(row_indices), row_indices, col_indices):
+                    if int(row_idx) == 0 and int(col_idx) == 0:
+                        sample_indices.append((batch_idx - 1, max_row_idx, max_col_idx,0))
+                    else:
+                        sample_indices.append((batch_idx, int(row_idx), int(col_idx), 0))
+        else:
+            raise NotImplementedError("Parallel sampling method not implemented")
+        
+        self.sample_indices = sample_indices
+                
     def recover_synthetic_datasets(self, sample_indices):
         
         def nth(iterable, n, default=None):
@@ -713,48 +754,59 @@ class Sampler(FileManager):
         for batch_idx, comb_idx in zip(batches, combs_idxs):
             
             # Reconstruct slice
-            recovered_slice = itertools.islice(itertools.combinations(range(self.synth_features.shape[0]), self.dimensionality),\
-                                               (batch_idx)*self.batch_size, (batch_idx+1)*self.batch_size)
+            start = int((batch_idx)*self.batch_size)
+            stop = int((batch_idx + 1)*self.batch_size)
+            recovered_slice = itertools.islice(itertools.combinations(range(self.synth_features.shape[0]), self.dimensionality), start, stop)
             
             # Recover the correct combination 
             combination = nth(recovered_slice, comb_idx)
             print ("Recovered combination", combination)
-        
             # Recover the feature matrix
-            feature_matrices.append(self.synth_features[combination,:])
+            feature_matrices.append(self.synth_features[combination, :])
 
         # Reconstruct the targets for the synthethic feature matrix 
-        for feature_matrix,target_index in zip(feature_matrices,target_indices):
-            synthetic_data_sets.append(np.concatenate((feature_matrix, self.synth_targets[target_index,:].reshape(self.synth_targets.shape[1],1)), axis = 1))
+        for feature_matrix, target_index in zip(feature_matrices,target_indices):
+            synthetic_data_sets.append(np.concatenate((feature_matrix, self.synth_targets[target_index, :].reshape(self.synth_targets.shape[1], 1)), axis = 1))
             
         self.sampled_data_sets = synthetic_data_sets
         
-    def sample(self, directory = '', filenames = [] , n_batches = 0, batch_size = 0, partition_function = 0, max_scaled_utility = 1, dimensionality = 2,\
-               synth_features = [], synth_targets = []):
+    def sample(self, directory = '', filenames = [] , batch_size = 0, partition_function = 0, cumulative_partition = [],\
+               max_scaled_utility = 1, dimensionality = 2, synth_features = [], synth_targets = [], \
+               property_preserved = 'second_moments', F_tilde_x = 0, scaling_const = 0, seed = 23, basename = '', \
+               experiment_name = '', save_data = True):
+        
+        np.random.seed(seed)
         
         # Set class properties
         if self.samples_only:
+            np.random.seed(seed = self.seed)
             self.unpack_arguments()
         else:
             self.directory = directory
             self.batch_size = batch_size
-            self.n_batches = n_batches
             self.partition_function = partition_function 
             self.filenames = filenames 
             self.max_scaled_utility = max_scaled_utility
             self.synth_features = synth_features
             self.synth_targets = synth_targets
-            self.dimensionality  = dimensionality 
-            self.pack_arguments()
+            self.dimensionality  = dimensionality
+            self.F_tilde_x = F_tilde_x
+            self.scaling_const = scaling_const
+            self.property_preserved = property_preserved
+            self.basename = basename
+            self.experiment_name = experiment_name
+            self.cumulative_partition = cumulative_partition
+            self.save_data = save_data
         
-        self.sample_datasets(self.n_batches, self.num_samples, self.filenames, self.partition_function)
+        self.sample_datasets(self.num_samples, self.filenames, self.partition_function, cumulative_partition)
         self.recover_synthetic_datasets(self.sample_indices)
+        self.pack_arguments()
         
 class SyntheticDataGenerator(FileManager):
     
     def __init__(self, private_data, OutcomeSpace, Sampler = [], privacy_constant = 0.1, 
                  num_points_features = 8 , num_points_targets = 5 , \
-                 feat_latt_path = '', target_latt_path = ''):
+                 feat_latt_path = '', target_latt_path = '', seed = 23):
         ''' Parameters:
             @ private_data: an object containing the private data. Features are stored
             in the private_data.features and targets in private_data.targets.
@@ -768,6 +820,7 @@ class SyntheticDataGenerator(FileManager):
             @ target_latt_path: path to the lattice from which the synthethic target
             vectors are drawn. If not specified a lattice is intiliased upon call 
             of the generate_data method '''
+            
         super(SyntheticDataGenerator, self).__init__()
         # Synthetic data properties
         self.property_preserved = 'second_moments' # overwritten by the generate_data method
@@ -797,6 +850,9 @@ class SyntheticDataGenerator(FileManager):
         # Storage for sampling parameters - this can be passed to a Sampler() object 
         # to gather more samples 
         self.sampling_parameters = {}
+        
+        # Random number generation properties
+        self.seed = seed 
         
     def initilise_lattices(self):        
         
@@ -840,28 +896,28 @@ class SyntheticDataGenerator(FileManager):
         self.property_preserved = property_preserved
         
         # Define experiment name
-        experiment_name = "s_eps" + str(self.epsilon).replace(".","") + "d" +\
-                                str(self.dimensionality) + "nt" + str(self.num_points_targets) +\
+        experiment_name = "s_eps" + str(self.epsilon).replace(".","") + "d" + \
+                                str(self.dimensionality) + "nt" + str(self.num_points_targets) + \
                                 "nf" + str(self.num_points_features)
         
         # Generate outcomes and compute their scores
         self.outcome_space.generate_outcomes(experiment_name = experiment_name, synth_features = self.synthetic_features, \
                                              synth_targets = self.synthetic_targets, private_data = self.private_data,\
-                                             property_preserved = self.property_preserved, privacy_constant = self.epsilon)
-        
+                                             property_preserved = self.property_preserved, privacy_constant = self.epsilon)        
         # Sample the outcome space
-        self.sampler.sample(directory = self.outcome_space.directory, filenames = self.outcome_space.filenames, n_batches = self.outcome_space.n_batches,\
+        self.sampler.sample(directory = self.outcome_space.directory, filenames = self.outcome_space.filenames,\
                             batch_size = self.outcome_space.batch_size, partition_function = self.outcome_space.partition_function, \
-                            max_scaled_utility = self.outcome_space.max_scaled_utility, dimensionality = self.dimensionality, synth_features = self.synthetic_features,\
-                            synth_targets = self.synthetic_targets)
-        
+                            cumulative_partition = self.outcome_space.cumulative_partition, max_scaled_utility = self.outcome_space.max_scaled_utility, \
+                            dimensionality = self.dimensionality, synth_features = self.synthetic_features, synth_targets = self.synthetic_targets, \
+                            property_preserved = self.property_preserved, F_tilde_x = self.outcome_space.F_tilde_x, scaling_const = self.outcome_space.scaling_const,\
+                            seed = self.seed, basename = self.outcome_space.basename, experiment_name = experiment_name, save_data = self.outcome_space.save_data)
         # Return sampled values
         self.sampling_parameters = self.sampler.sampling_parameters
         self.synthetic_datasets = self.sampler.sampled_data_sets
         self.save_synthetic_data(self.synthetic_datasets, self.sampler.directory, experiment_name)
         print ("The sampled datasets are", self.synthetic_datasets)
 
-def est_outcome_space_size(N,d,k, covariance_only = False):
+def est_outcome_space_size(N, d, k, covariance_only = False):
     '''This function estimates the size of the outcome space as a function of:
         @ N: Total number of vectors inside the d-dimensional sphere
           d: private data dimensionality

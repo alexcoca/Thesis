@@ -23,27 +23,32 @@ if __name__ == '__main__':
     private_data.generate_data()
     
     # Initialise OutcomeSpaceGenerator()
-    batch_size = 7500
+    batch_size = 250
     directory = 'D:/Thesis/Experiments'
     parallel = True
     workers = 6 # number of worker processes
+    save_data = False
     partition_method = 'fast_2'
     OutcomeSpaceGenerator = OutcomeSpaceGenerator(directory = directory, batch_size = batch_size, parallel = parallel,\
-                                                  workers = workers, partition_method = partition_method)
+                                                  workers = workers, partition_method = partition_method, save_data = save_data)
     
     # Initialise Sampler() object
     num_samples = 5
-    seed = 23
     samples_only = False
-    SamplerInstance = Sampler(num_samples = num_samples, seed = seed, partition_method = partition_method, samples_only = samples_only)
+    sample_parallel = False
+    load_data = True
+    SamplerInstance = Sampler(num_samples = num_samples, partition_method = partition_method, \
+                              samples_only = samples_only, sample_parallel = sample_parallel, \
+                              load_data = load_data)
     
     # Initialise SyntheticDataGenerator() object 
-    num_points_targets = 10 # Number of points for interval discretisation
-    num_points_features = 10 # Number of points for l2-lattice discretisation
+    num_points_targets = 6 # Number of points for interval discretisation
+    num_points_features = 8 # Number of points for l2-lattice discretisation
     epsilon = 0.1
+    seed = 23
     SyntheticDataGenerator = SyntheticDataGenerator(private_data, OutcomeSpaceGenerator, Sampler = SamplerInstance,\
                                                      privacy_constant = epsilon, num_points_features = num_points_features,
-                                                     num_points_targets = num_points_targets)
+                                                     num_points_targets = num_points_targets, seed = seed)
      
     t_start = time.time()
     SyntheticDataGenerator.generate_data(property_preserved = 'second_moments')
