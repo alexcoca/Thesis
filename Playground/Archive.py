@@ -204,3 +204,89 @@ def sample_datasets(self, n_batches, num_samples, filenames, partition_function)
             sample_indices.append(get_sample(scaled_partition))
     
         self.sample_indices = sample_indices 
+
+# Old sampling method (08/07)
+        
+def sample_datasets(self, num_samples, filenames, raw_partition_function, cumulative_partition):
+        
+        def get_batch_id(filename):
+            return int(filename[filename.rfind("_") + 1: ])
+        
+        # Sort filenames to ensure correct access of stored data
+        filenames  = sorted(filenames, key = get_batch_id)
+        
+        # Scale partition function
+        scaled_partitions = raw_partition_function * np.random.random(size=(num_samples,))
+        
+        # Obtain cumulative partition function - needs to be a numpy array in the actual implementation
+        batches = np.searchsorted(cumulative_partition, scaled_partitions)
+        
+        # Shrink partitions to account for the contribution of all previous batches
+        scaled_partitions[batches >= 1] = scaled_partitions[batches >= 1] - cumulative_partition[batches[batches >= 1] - 1]
+        
+        # This is necessary so that the matrix recovery proceducre can work in general
+        self.partition_residuals = scaled_partitions
+        
+        if not self.sample_parallel:
+        
+            sample_indices = []
+            
+            # Create a dictionary with each batch as a separate key, to handle cases when 
+            # there are multiple samples from the same batch without loading the data twice
+            batch_dictionary = {}
+            
+            for key,value in zip(batches, scaled_partitions):
+                batch_dictionary.setdefault(key, []).append(value)
+                
+            # For each batch, load the data and calculate the row index
+            for key in batch_dictionary.keys():
+                if self.load_data:
+                    if not self.save_data:
+                        raise RuntimeError("Cannot load data that has not be saved. Initialise OutcomeSpaceGenerator with \
+                                           save_data = True and then re-run the experiment!")
+                    scores = self.retrieve_scores(filenames, batches= [key])[0]['scaled_utilities']
+                    if not self.partition_method == 'slow':
+                        scores = np.exp(scores)
+                else:
+                    # Or alternatively regenerate the relevant part of the outcome space on the fly if the data 
+                    # has not been stored
+                    scores = np.exp(self.generate_batch(key))
+                    
+                max_row_idx = scores.shape[0] - 1
+                max_col_idx = scores.shape[1] - 1
+                # Calculate the cumulative scores
+#                cum_scores = np.cumsum(np.sum(scores, axis=1))        
+#                
+#                # Find the rows in the score matrix
+#                row_indices = np.searchsorted(cum_scores, batch_dictionary[key])
+#                
+#                # Rescale partitions to account for the contribution of rows
+#                partition_residuals = np.zeros(shape=(len(row_indices,)))
+#                partition_residuals[row_indices >= 1] = np.array(batch_dictionary[key])[row_indices >= 1] - \
+#                                                        cum_scores[row_indices[row_indices >= 1] - 1]
+#                if np.any(row_indices < 1):
+#                    partition_residuals[row_indices < 1] = np.array(batch_dictionary[key])[row_indices < 1]
+#                    
+#                # Determine the column index for each partition residual in the corresponding row
+#                col_indices = []
+#                for i in range(len(row_indices)):
+#                    col_index = np.searchsorted(np.cumsum(scores[row_indices[i],:]), partition_residuals[i])
+#                    if  col_index > 0:
+#                        col_indices.append(col_index - 1)
+#                    else:
+#                        col_indices.append(max_col_idx)
+#                        row_indices[i] = row_indices[i] - 1
+                
+                row_indices, col_indices = self.get_sample_coordinates(scores, batch_dictionary[key])
+                # Add index tuples to the samples list
+                for batch_idx, row_idx, col_idx in zip([key]*len(row_indices), row_indices, col_indices):
+                    if int(row_idx) == 0 and int(col_idx) == 0:
+                        sample_indices.append((batch_idx - 1, max_row_idx, max_col_idx,0))
+                    else:
+                        sample_indices.append((batch_idx, int(row_idx), int(col_idx), 0))
+        else:
+            sample_indices = self.get_samples_parallel(batches)
+            # TODO process output of get_samples_parallel
+        
+        self.sample_indices = sample_indices
+    

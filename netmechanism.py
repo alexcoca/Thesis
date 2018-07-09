@@ -17,8 +17,8 @@ import time
 from netmechanism_helpers import FileManager
 
 from multiprocessing import Pool
-import multiprocessing.util as util
-util.log_to_stderr(util.SUBDEBUG)
+#import multiprocessing.util as util
+#util.log_to_stderr(util.SUBDEBUG)
 
 class FeaturesLattice(FileManager):
     
@@ -543,7 +543,7 @@ class OutcomeSpaceGenerator(FileManager):
 #            further_results = pool.imap(self.evaluate_sample_score,range(last_batch,self.n_batches,1))
 #            pool.close()
 #            pool.join()
-        print("Pool execution complete")
+        print("Outcome space generation parallel pool execution complete")
         if self.save_data:
             self.filenames = glob.glob(self.directory + "/*")
         self.calculate_partition_function(results = results, partition_method = self.partition_method)
@@ -601,7 +601,10 @@ class Sampler(FileManager):
         self.sampled_data_sets = []
         
     def unpack_arguments(self):
-        self.directory = self.sampling_parameters['directory']
+        try:
+            self.directory = self.sampling_parameters['directory']
+        except KeyError:
+            pass
         self.batch_size = self.sampling_parameters['batch_size']
         self.partition_function = self.sampling_parameters['partition_function']
         self.cumulative_partition = self.sampling_parameters['cumulative_partition']
@@ -619,13 +622,15 @@ class Sampler(FileManager):
         self.experiment_name = self.sampling_parameters['experiment_name']
     
     def pack_arguments(self):
-        self.sampling_parameters = {'directory': self.directory,'batch_size': self.batch_size,
-                                    'partition_function': self.partition_function, 'max_scaled_utility': self.max_scaled_utility, \
-                                    'synth_features': self.synth_features, 'synth_targets': self.synth_targets,\
-                                    'dimensionality': self.dimensionality, 'load_data':self.load_data, 'sampled_indices': self.sample_indices,\
-                                    'F_tilde_x': self.F_tilde_x, 'scaling_const': self.scaling_const, 'experiment_name': self.experiment_name, \
+        self.sampling_parameters = {'batch_size': self.batch_size,'partition_function': self.partition_function, \
+                                    'max_scaled_utility': self.max_scaled_utility, 'synth_features': self.synth_features, \
+                                    'synth_targets': self.synth_targets,'dimensionality': self.dimensionality, \
+                                    'load_data': self.load_data, 'sampled_indices': self.sample_indices, 'F_tilde_x': self.F_tilde_x, \
+                                    'scaling_const': self.scaling_const, 'experiment_name': self.experiment_name, \
                                     'cumulative_partition': self.cumulative_partition}
+        
         if self.load_data:
+            self.sampling_parameters['directory'] =  self.directory
             self.sampling_parameters['filenames'] =  self.filenames,
         path = self.basename + "/" + self.experiment_name + "/SamplingLog/"
         self.save(self.sampling_parameters, path, self.experiment_name)
@@ -645,9 +650,63 @@ class Sampler(FileManager):
         
         return scaled_utilities_batch
     
-    def generate_batch_parallel(self):
-        pass
+    def get_sample_coordinates(self, scores, partition_residuals):
+        
+        max_col_idx = scores.shape[1] - 1
+        # Calculate the cumulative scores
+        cum_scores = np.cumsum(np.sum(scores, axis = 1))     
+        # Find the rows in the score matrix
+        row_indices = np.searchsorted(cum_scores, partition_residuals)
+        
+        # Rescale partitions to account for the contribution of rows
+        rescaled_partitions = np.zeros(shape=(len(row_indices,)))
+        rescaled_partitions[row_indices >= 1] = np.array(partition_residuals)[row_indices >= 1] - \
+                                                cum_scores[row_indices[row_indices >= 1] - 1]
+        if np.any(row_indices < 1):
+            rescaled_partitions[row_indices < 1] = np.array(partition_residuals)[row_indices < 1]
+            
+        # Determine the column index for each partition residual in the corresponding row
+        col_indices = []
+        for i in range(len(row_indices)):
+            col_index = np.searchsorted(np.cumsum(scores[row_indices[i],:]), rescaled_partitions[i])
+            if  col_index > 0:
+                col_indices.append(col_index - 1)
+            else:
+                col_indices.append(max_col_idx)
+                row_indices[i] = row_indices[i] - 1
+                
+                
+        return (row_indices,col_indices)
     
+    def process_sample(self, batches_partitions):
+        
+        # Unpack batch index and the corresponding partition residual
+        batch_index = batches_partitions[0] 
+        partition_residual = batches_partitions[1]
+        
+        # Reconstruct the scores matrix
+        scores = np.exp(self.generate_batch(batch_index))
+        max_row_idx = scores.shape[0] - 1
+        max_col_idx = scores.shape[1] - 1
+        # Find how many elements of the scores matrix have to be subtracted from
+        # the partition residual to obtain its smallest positive value
+        row_indices, col_indices = self.get_sample_coordinates(scores,[partition_residual])
+        # Return the sample indices
+        for batch_idx, row_idx, col_idx in zip([batch_index]*len(row_indices), row_indices, col_indices):
+            if int(row_idx) == 0 and int(col_idx) == 0:
+                sample_index = (batch_idx - 1, max_row_idx, max_col_idx)
+            else:
+                sample_index = (batch_idx, int(row_idx), int(col_idx))        
+        return sample_index 
+    
+    def get_samples_parallel(self, batches_partitions):
+        print ("Starting parallel sampling procedure")
+        workers = min(self.num_samples, os.cpu_count())
+        pool = Pool(workers)
+        samples = pool.imap(self.process_sample, batches_partitions)
+        pool.close()
+        pool.join()
+        return list(samples)
     
     def sample_datasets(self, num_samples, filenames, raw_partition_function, cumulative_partition):
         
@@ -665,7 +724,6 @@ class Sampler(FileManager):
         
         # Shrink partitions to account for the contribution of all previous batches
         scaled_partitions[batches >= 1] = scaled_partitions[batches >= 1] - cumulative_partition[batches[batches >= 1] - 1]
-        
         # This is necessary so that the matrix recovery proceducre can work in general
         self.partition_residuals = scaled_partitions
         
@@ -696,38 +754,24 @@ class Sampler(FileManager):
                     
                 max_row_idx = scores.shape[0] - 1
                 max_col_idx = scores.shape[1] - 1
-                # Calculate the cumulative scores
-                cum_scores = np.cumsum(np.sum(scores, axis=1))        
                 
-                # Find the rows in the score matrix
-                row_indices = np.searchsorted(cum_scores, batch_dictionary[key])
-                
-                # Rescale partitions to account for the contribution of rows
-                partition_residuals = np.zeros(shape=(len(row_indices,)))
-                partition_residuals[row_indices >= 1] = np.array(batch_dictionary[key])[row_indices >= 1] - \
-                                                        cum_scores[row_indices[row_indices >= 1] - 1]
-                if np.any(row_indices < 1):
-                    partition_residuals[row_indices < 1] = np.array(batch_dictionary[key])[row_indices < 1]
-                    
-                # Determine the column index for each partition residual in the corresponding row
-                col_indices = []
-                for i in range(len(row_indices)):
-                    col_index = np.searchsorted(np.cumsum(scores[row_indices[i],:]), partition_residuals[i])
-                    if  col_index > 0:
-                        col_indices.append(col_index - 1)
-                    else:
-                        col_indices.append(max_col_idx)
-                        row_indices[i] = row_indices[i] - 1
-                        
+                # Return the row and column of the element of the score matrix with the property that
+                # the difference between the partion residual and the cumulative sum of the matrix elements 
+                # up to that element is the smallest positive number.
+                row_indices, col_indices = self.get_sample_coordinates(scores, batch_dictionary[key])
                 # Add index tuples to the samples list
                 for batch_idx, row_idx, col_idx in zip([key]*len(row_indices), row_indices, col_indices):
                     if int(row_idx) == 0 and int(col_idx) == 0:
-                        sample_indices.append((batch_idx - 1, max_row_idx, max_col_idx,0))
+                        sample_indices.append((batch_idx - 1, max_row_idx, max_col_idx))
                     else:
-                        sample_indices.append((batch_idx, int(row_idx), int(col_idx), 0))
+                        sample_indices.append((batch_idx, int(row_idx), int(col_idx)))
         else:
-            raise NotImplementedError("Parallel sampling method not implemented")
-        
+            # TODO: Make parallel version work with multiple samples from the same batch
+            # Task 1: Build hash table (? could simply put the if else statement a few lines down)
+            # and convert to list of tuples (batch, [partition_residuals])
+            batches_partitions = zip(batches,scaled_partitions)
+            sample_indices = self.get_samples_parallel(batches_partitions)
+            print("Parallel sampling procedure complete")
         self.sample_indices = sample_indices
                 
     def recover_synthetic_datasets(self, sample_indices):
@@ -915,7 +959,7 @@ class SyntheticDataGenerator(FileManager):
         self.sampling_parameters = self.sampler.sampling_parameters
         self.synthetic_datasets = self.sampler.sampled_data_sets
         self.save_synthetic_data(self.synthetic_datasets, self.sampler.directory, experiment_name)
-        print ("The sampled datasets are", self.synthetic_datasets)
+        # print ("The sampled datasets are", self.synthetic_datasets)
 
 def est_outcome_space_size(N, d, k, covariance_only = False):
     '''This function estimates the size of the outcome space as a function of:

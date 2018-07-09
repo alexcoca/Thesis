@@ -701,10 +701,10 @@ def recover_synthetic_datasets(sample_indices):
 utility_arrays = [] # Utility arrays
 
 # Declare experiment parameters
-dim = 3
-num_points_feat = 8
-num_points_targ = 6
-batch_size = 250
+dim = 2
+num_points_feat = 20
+num_points_targ = 20
+batch_size = 10
 n_private = 20
 
 # Declare privacy paramters
@@ -746,7 +746,7 @@ for batch_index in range(n_batches):
     results.append(evaluate_sample_score(batch_index))
 t_elapsed = time.time()
 
-print("Time elapsed for single core processing of this small case is..." + " " + str(t_elapsed-t_start))
+print("Time elapsed for single core processing of this small case is..." + " " + str(t_elapsed - t_start))
 
 # Test that data reloading function works - seems to work fine
 
@@ -863,7 +863,7 @@ print ("Alternative method for calculating partition function gives", partition_
 
 # Now let's test the sampling procedure...
 
-num_samples = 5
+num_samples = 10
 seed = 23
 
 sample_indices = sample_dataset(n_batches, num_samples, raw_partition_function, filenames, seed)

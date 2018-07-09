@@ -10,9 +10,8 @@ from netmechanism import OutcomeSpaceGenerator, Sampler, SyntheticDataGenerator
 import time
 
 # from multiprocessing import Pool, current_process 
-import multiprocessing.util as util
-util.log_to_stderr(util.SUBDEBUG)
-
+# import multiprocessing.util as util
+# util.log_to_stderr(util.SUBDEBUG)
 
 if __name__ == '__main__':
     # Initialise private_data object
@@ -23,7 +22,7 @@ if __name__ == '__main__':
     private_data.generate_data()
     
     # Initialise OutcomeSpaceGenerator()
-    batch_size = 250
+    batch_size = 7500
     directory = 'D:/Thesis/Experiments'
     parallel = True
     workers = 6 # number of worker processes
@@ -33,17 +32,17 @@ if __name__ == '__main__':
                                                   workers = workers, partition_method = partition_method, save_data = save_data)
     
     # Initialise Sampler() object
-    num_samples = 5
+    num_samples = 25
     samples_only = False
-    sample_parallel = False
-    load_data = True
+    sample_parallel = True
+    load_data = False
     SamplerInstance = Sampler(num_samples = num_samples, partition_method = partition_method, \
                               samples_only = samples_only, sample_parallel = sample_parallel, \
                               load_data = load_data)
     
     # Initialise SyntheticDataGenerator() object 
-    num_points_targets = 6 # Number of points for interval discretisation
-    num_points_features = 8 # Number of points for l2-lattice discretisation
+    num_points_targets = 10 # Number of points for interval discretisation
+    num_points_features = 10 # Number of points for l2-lattice discretisation
     epsilon = 0.1
     seed = 23
     SyntheticDataGenerator = SyntheticDataGenerator(private_data, OutcomeSpaceGenerator, Sampler = SamplerInstance,\
