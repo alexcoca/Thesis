@@ -848,7 +848,7 @@ class Sampler(FileManager):
         
 class SyntheticDataGenerator(FileManager):
     
-    def __init__(self, private_data, OutcomeSpace, Sampler = [], privacy_constant = 0.1, 
+    def __init__(self, private_data, OutcomeSpace, Sampler, privacy_constant = 0.1, 
                  num_points_features = 8 , num_points_targets = 5 , \
                  feat_latt_path = '', target_latt_path = '', seed = 23):
         ''' Parameters:

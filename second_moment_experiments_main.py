@@ -13,44 +13,31 @@ import time
 # import multiprocessing.util as util
 # util.log_to_stderr(util.SUBDEBUG)
 
-if __name__ == '__main__':
+def second_order_moment_experiment(dimensionality = 2, num_records = 20, batch_size = 7500, directory = '',\
+                                   parallel = True, save_data = False, partition_method = 'fast_2', workers = -1, \
+                                   num_samples = 25, samples_only = False, sample_parallel = True, load_data = False,\
+                                   num_points_targets = 10, num_points_features = 10, epsilon = 0.1, seed = 23):
     # Initialise private_data object
     # '__spec__' = None
-    dimensionality = 3
-    num_records = 20
     private_data = ContinuousGenerator(d = dimensionality, n = num_records)
     private_data.generate_data()
     
     # Initialise OutcomeSpaceGenerator()
-    batch_size = 7500
-    directory = 'D:/Thesis/Experiments'
-    parallel = True
-    workers = 6 # number of worker processes
-    save_data = False
-    partition_method = 'fast_2'
-    OutcomeSpaceGenerator = OutcomeSpaceGenerator(directory = directory, batch_size = batch_size, parallel = parallel,\
+    OutcomeSpace = OutcomeSpaceGenerator(directory = directory, batch_size = batch_size, parallel = parallel,\
                                                   workers = workers, partition_method = partition_method, save_data = save_data)
     
     # Initialise Sampler() object
-    num_samples = 25
-    samples_only = False
-    sample_parallel = True
-    load_data = False
     SamplerInstance = Sampler(num_samples = num_samples, partition_method = partition_method, \
                               samples_only = samples_only, sample_parallel = sample_parallel, \
                               load_data = load_data)
     
     # Initialise SyntheticDataGenerator() object 
-    num_points_targets = 10 # Number of points for interval discretisation
-    num_points_features = 10 # Number of points for l2-lattice discretisation
-    epsilon = 0.1
-    seed = 23
-    SyntheticDataGenerator = SyntheticDataGenerator(private_data, OutcomeSpaceGenerator, Sampler = SamplerInstance,\
-                                                     privacy_constant = epsilon, num_points_features = num_points_features,
-                                                     num_points_targets = num_points_targets, seed = seed)
+    SyntheticData = SyntheticDataGenerator(private_data, OutcomeSpace, SamplerInstance, privacy_constant = epsilon,\
+                                           num_points_features = num_points_features, num_points_targets = num_points_targets, \
+                                           seed = seed)
      
     t_start = time.time()
-    SyntheticDataGenerator.generate_data(property_preserved = 'second_moments')
+    SyntheticData.generate_data(property_preserved = 'second_moments')
     t_end = time.time()
     
     if parallel == True:
@@ -59,8 +46,10 @@ if __name__ == '__main__':
         print("Elapsed time without parallelisation is " + str(t_end - t_start))
     
     # Synthetic data 
-    synthetic_data_integrated = SyntheticDataGenerator.synthetic_datasets
-
+    synthetic_data_integrated = SyntheticData.synthetic_datasets
+    return synthetic_data_integrated
+    
+    
 ## Sample more data 
     
 #params = SyntheticDataGenerator.sampling_parameters
@@ -75,7 +64,24 @@ if __name__ == '__main__':
 #AuxilliarySampler.sample()
 #new_samples = AuxilliarySampler.sampled_data_sets
 
-    
+if __name__ == '__main__':
+     # Define experiment parameters
+    dimensionality = 3
+    num_records = 20
+    batch_size = 7500
+    directory = '/homes/ac2123/Thesis'
+    parallel = True
+    save_data = False
+    partition_method = 'fast_2'
+    workers = -1
+    num_samples = 25
+    sample_parallel = True
+    load_data = False
+    num_points_targets = 10
+    num_points_features = 10
+    epsilon = 0.1
+    seed = 23
+    result = second_order_moment_experiment()
 
 
 
