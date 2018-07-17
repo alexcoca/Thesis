@@ -260,7 +260,7 @@ class ContinuousGenerator():
         target_bound = 1
         
         # Sample coefficients
-        self.coefs = (upper_bound-lower_bound)*np.random.random((self.d,1)) + lower_bound
+        self.coefs = (upper_bound-lower_bound)*np.random.random((self.d, 1)) + lower_bound
         
         # Sample features and normalise them s.t. their 2-norm is <=1
         self.features = np.random.normal(loc = self.mean, scale = self.variance, size = (self.n, self.d))
@@ -272,7 +272,8 @@ class ContinuousGenerator():
         temp_targets = np.sum(self.coefs.T*self.features, axis = 1, keepdims = True)
         
         # Add noise to the targets 
-        if se
+        if self.perturbation:
+            temp_targets = temp_targets + np.random.normal(size = temp_targets.shape)
         
         # Check if all targets are within the bounds 
         if np.all(np.abs(temp_targets) <= target_bound):
@@ -284,8 +285,8 @@ class ContinuousGenerator():
             while resample_no > 0:
                 
                 # Resample solutions and calculate their corresponding targets
-                proposed_features = np.random.normal(loc=self.mean,scale=self.variance,size=(resample_no,self.d))
-                proposed_targets = np.sum(self.coefs.T*proposed_features,axis=1,keepdims=True)
+                proposed_features = np.random.normal(loc = self.mean, scale = self.variance, size = (resample_no, self.d))
+                proposed_targets = np.sum(self.coefs.T*proposed_features, axis = 1, keepdims = True)
                 
                 # How many good targets have we sampled 
                 good_targets = proposed_targets[np.abs(proposed_targets) <= target_bound]
@@ -296,26 +297,26 @@ class ContinuousGenerator():
                 self.features[rep_indices,:] = good_features
             
             # Calculate targets
-            self.targets = np.sum(self.coefs.T*self.features,axis=1,keepdims=True)
+            self.targets = np.sum(self.coefs.T*self.features, axis = 1, keepdims = True)
                 
         self.data = np.concatenate((self.features,self.targets),axis=1)
         
     def plot_data(self):
         ''' Plot generated data if the dimensionality of the data is one'''
         if self.d == 1:
-            plt.plot(self.features,self.targets,'b*')
+            plt.plot(self.features, self.targets,'b*')
         if self.d == 2:
             num_pts = 50
             fig = plt.figure()
-            ax = fig.add_subplot(111,projection='3d')
+            ax = fig.add_subplot(111, projection = '3d')
             # Create grid 
-            x_coord = np.linspace(np.min(self.features[:,0]),np.max(self.features[:,0]),num=num_pts,endpoint=True)
-            y_coord = np.linspace(np.min(self.features[:,1]),np.max(self.features[:,1]),num=num_pts,endpoint=True)
+            x_coord = np.linspace(np.min(self.features[:,0]), np.max(self.features[:,0]), num = num_pts, endpoint = True)
+            y_coord = np.linspace(np.min(self.features[:,1]), np.max(self.features[:,1]), num = num_pts, endpoint = True)
             xx,yy = np.meshgrid(x_coord,y_coord)
             # Evaluate the function on the grid
             z = self.coefs[0]*xx + self.coefs[1]*yy
             ax.plot_surface(xx,yy,z,alpha=0.2)
-            ax.scatter(self.features[:,0],self.features[:,1],self.targets[:])
+            ax.scatter(self.features[:,0], self.features[:,1], self.targets[:])
             for angle in range(0, 360):
                 ax.view_init(30, angle)
                 plt.draw()
