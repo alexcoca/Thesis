@@ -199,7 +199,7 @@ class DiscreteGenerator():
             # Again, need to handle the case where 
             pass
         # Store everything in one data structure
-        self.data = np.zeros((num_pts,2))
+        self.data = np.zeros((num_pts, 2))
         self.data[:,0] = self.x_locs
         self.data[:,1] = self.y_locs
         # TODO: when more than one point is to be alocated at a specific coordinate, \
@@ -210,21 +210,28 @@ class DiscreteGenerator():
 
 class ContinuousGenerator():
     
-    def __init__(self,d=1,n=1,mean=0,variance=1):
+    def __init__(self, d = 1, n = 1, mean = 0, variance = 1, perturbation = False, perturbation_mean = 0, perturbation_variance = 1, seed = 23):
         ''' Parameters:
             @ d (dimensionality): number of features
-            @ n: number of data points'''
+            @ n: number of data points
+            @ perturbation: if True, Gaussian noise with @perturbation_mean
+            and @perturbation_variance is added to the targets
+            @mean, variance: mean and variance of the Gaussian that is used to generate the
+            feature vector coordinates'''
         self.d = d
         self.n = n
         self.features = []
         self.targets = []
         self.data = []
         self.coefs = []
+        self.perturbation = perturbation 
+        self.perturbation_variance = perturbation_variance
         self.variance = variance
+        self.perturbation_mean = perturbation_mean
         self.mean = mean
-        self.seed = 23
+        self.seed = seed
         
-    def generate_data(self,seed=23,bound_recs=True):
+    def generate_data(self, seed=23 ,bound_recs=True):
         ''' This function generates data on a hyperplane in R^d. 
         The coefficients (@coeff) are sampled at random from [-1,1].
         The domain points are sampled using a Gaussian distribution.
@@ -246,8 +253,7 @@ class ContinuousGenerator():
             mask[indices] = True
             
             return indices,mask
-        
-        
+
         self.seed = np.random.seed(seed)
         upper_bound = 1
         lower_bound = -1
@@ -257,13 +263,16 @@ class ContinuousGenerator():
         self.coefs = (upper_bound-lower_bound)*np.random.random((self.d,1)) + lower_bound
         
         # Sample features and normalise them s.t. their 2-norm is <=1
-        self.features = np.random.normal(loc=self.mean,scale=self.variance,size=(self.n,self.d))
+        self.features = np.random.normal(loc = self.mean, scale = self.variance, size = (self.n, self.d))
         if bound_recs == True:
             self.features = mlutils.bound_records_norm(self.features)
             # y_idx = np.where(np.logical_and(self.lattice['y_vals'] >= lower_limit,self.lattice['y_vals'] <= upper_limit))
 
         # Generate targets restricted to [-target_bound,target_bound]
-        temp_targets = np.sum(self.coefs.T*self.features,axis=1,keepdims=True)
+        temp_targets = np.sum(self.coefs.T*self.features, axis = 1, keepdims = True)
+        
+        # Add noise to the targets 
+        if se
         
         # Check if all targets are within the bounds 
         if np.all(np.abs(temp_targets) <= target_bound):

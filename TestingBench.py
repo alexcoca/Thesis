@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 """
 Created on Thu May 24 20:24:09 2018
@@ -89,7 +90,7 @@ import testutilities
 import numpy as np
 import math
 
-dim = 3
+dim = 1
 num_points = 10
 upper_bound = 1.0
 lower_bound = -1.0
