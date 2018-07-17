@@ -220,8 +220,11 @@ class ContinuousGenerator():
             feature vector coordinates'''
         self.d = d
         self.n = n
+        self.test_targets = []
+        self.test_features = []
+        self.test_data = []
         self.features = []
-        self.targets = []
+        self.targets = np.zeros(shape=(n,1))
         self.data = []
         self.coefs = []
         self.perturbation = perturbation 
@@ -231,14 +234,14 @@ class ContinuousGenerator():
         self.mean = mean
         self.seed = seed
         
-    def generate_data(self, seed=23 ,bound_recs=True):
+    def generate_data(self, seed = 23, test_frac = 0.0, bound_recs = True):
         ''' This function generates data on a hyperplane in R^d. 
         The coefficients (@coeff) are sampled at random from [-1,1].
         The domain points are sampled using a Gaussian distribution.
         If bound_recs is set to True, then a transformation is applied to the
         dataset such that the records have 2-norm <= unity.'''
         
-        def get_indices(mask,n_rep):
+        def get_indices(mask, n_rep):
             ''' Finds the indices of the feature vectors that yielded a target 
             >= target bound and returns a subset equal to the number of replacements that 
             can be made as well as mask, which reflects the updated state of mask after samples replacement'''
@@ -247,12 +250,12 @@ class ContinuousGenerator():
             good_values = [False]
             
             # Choose the first n_rep indices corresponding to features that generate targets >= target_bound
-            indices = np.where(np.isin(mask,good_values))[0][:n_rep]
+            indices = np.where(np.isin(mask, good_values))[0][:n_rep]
             
             # Update the mask to reflect the fact that some of the features might have been updated
             mask[indices] = True
             
-            return indices,mask
+            return indices, mask
 
         self.seed = np.random.seed(seed)
         upper_bound = 1
@@ -260,12 +263,12 @@ class ContinuousGenerator():
         target_bound = 1
         
         # Sample coefficients
-        self.coefs = (upper_bound-lower_bound)*np.random.random((self.d, 1)) + lower_bound
+        self.coefs = (upper_bound - lower_bound)*np.random.random((self.d, 1)) + lower_bound
         
         # Sample features and normalise them s.t. their 2-norm is <=1
         self.features = np.random.normal(loc = self.mean, scale = self.variance, size = (self.n, self.d))
         if bound_recs == True:
-            self.features = mlutils.bound_records_norm(self.features)
+            self.features, normalizer = mlutils.bound_records_norm(self.features)
             # y_idx = np.where(np.logical_and(self.lattice['y_vals'] >= lower_limit,self.lattice['y_vals'] <= upper_limit))
 
         # Generate targets restricted to [-target_bound,target_bound]
@@ -273,7 +276,8 @@ class ContinuousGenerator():
         
         # Add noise to the targets 
         if self.perturbation:
-            temp_targets = temp_targets + np.random.normal(size = temp_targets.shape)
+            temp_targets = temp_targets + np.random.normal(loc = self.perturbation_mean, scale = self.perturbation_variance,\
+                                                           size = temp_targets.shape)
         
         # Check if all targets are within the bounds 
         if np.all(np.abs(temp_targets) <= target_bound):
@@ -281,30 +285,51 @@ class ContinuousGenerator():
         else:
             # Determine how many points need to be resampled so that all feature vectors yield targets within the desired bound
             mask = np.abs(temp_targets) <= target_bound
+            self.targets[mask] = temp_targets[mask]
             resample_no = len(temp_targets[np.logical_not(mask)])
             while resample_no > 0:
-                
                 # Resample solutions and calculate their corresponding targets
                 proposed_features = np.random.normal(loc = self.mean, scale = self.variance, size = (resample_no, self.d))
-                proposed_targets = np.sum(self.coefs.T*proposed_features, axis = 1, keepdims = True)
+                if bound_recs == True:
+                    max_norm = np.max(np.linalg.norm(proposed_features, ord = 2, axis = 1)) 
+                    if max_norm  < normalizer:
+                        # Normalise the proposed features
+                        proposed_features = proposed_features / normalizer
+                    else:
+                        proposed_features = proposed_features / max_norm
+                proposed_targets = np.sum(self.coefs.T*proposed_features, axis = 1, keepdims = True) 
+                if self.perturbation:
+                    proposed_targets = proposed_targets + np.random.normal(loc = self.perturbation_mean, scale = self.perturbation_variance, \
+                                                                           size = proposed_targets.shape)
                 
                 # How many good targets have we sampled 
                 good_targets = proposed_targets[np.abs(proposed_targets) <= target_bound]
                 good_features = proposed_features[np.ravel(np.abs(proposed_targets) <= target_bound)]
                 resample_no = resample_no - len(good_targets)
                 # Replace the feature vectors which yield targets >= target_bound by feature vectors which yield targets <= target_bound
-                rep_indices,mask = get_indices(mask,len(good_targets))
-                self.features[rep_indices,:] = good_features
-            
-            # Calculate targets
-            self.targets = np.sum(self.coefs.T*self.features, axis = 1, keepdims = True)
-                
-        self.data = np.concatenate((self.features,self.targets),axis=1)
+                rep_indices, mask = get_indices(mask,len(good_targets))
+                if good_features.size > 0:
+                    self.features[rep_indices,:] = good_features
+                    # Replace the old targets with new ones that are within the prescribed bound
+                    self.targets[rep_indices,:] = good_targets.reshape(good_targets.shape[0],-1)
+
+        # Slice arrays to create test data
+        if test_frac > 0.0:
+            slice_arr  = np.arange(self.features.shape[0] - self.n*test_frac, self.features.shape[0], dtype = int)
+            self.test_features = self.features[slice_arr,:]
+            self.test_targets = self.targets[slice_arr,:]
+            self.features = np.delete(self.features, slice_arr, axis = 0)
+            self.targets = np.delete(self.targets, slice_arr, axis = 0)
+            self.data = np.concatenate((self.features, self.targets), axis = 1)
+            self.test_data = np.concatenate((self.test_features, self.test_targets), axis = 1)
+        else:
+            self.data = np.concatenate((self.features, self.targets), axis = 1)
         
     def plot_data(self):
         ''' Plot generated data if the dimensionality of the data is one'''
         if self.d == 1:
-            plt.plot(self.features, self.targets,'b*')
+            plt.plot(self.features, self.targets, 'b*')
+            plt.plot(self.test_features, self.test_targets, 'r*')
         if self.d == 2:
             num_pts = 50
             fig = plt.figure()
