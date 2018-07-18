@@ -6,7 +6,7 @@ Created on Thu May 31 14:31:11 2018
 """
 
 import numpy as np
-import Utilities as utils
+import mlutilities as utils
 
 class Adassp():
     def __init__(self):
@@ -41,7 +41,7 @@ class Adassp():
         ''' This method releases regression coeffients with differential privacy.
         The method used is sufficient statistics pertrurbation with adaptive damping (#TODO: add ref)
         '''    
-        
+
         # Compute feature space bound 
         if self.X_bound == -1:
             self.X_bound = utils.compute_bound(X)
@@ -75,6 +75,48 @@ class Adassp():
         vec_priv = np.traspose(X)@y + (priv_const/self.X_bound)*self.y_bound*Z
         
         # Output regression parameters
-        reg_parameters = np.linalg.solve(Sigma_private+reg_param*np.eye(d),vec_priv)
+        reg_parameters = np.linalg.solve(Sigma_private + reg_param*np.eye(d), vec_priv)
         
         return reg_parameters
+    
+class Regression():
+    
+    def __init__(self):
+        self.parameters = []
+    
+    def fit_data(self, data):
+        
+        if len(data.shape) > 2:
+            
+            parameters = np.zeros(shape = (*data.shape[:-1],1))
+            
+            # Determine if there are any singular synthetic matrices
+            
+            # Calculate empirical covariance matrix for all the data sets
+            Sigma_tensor = np.transpose(data[:,:,:-1], axes = (0,2,1))@data[:,:,:-1] 
+            determinants = np.linalg.det(Sigma_tensor)
+            mask = np.isclose(determinants, 0.0)
+            if np.any(mask):
+                print("Warning, there were singular matrices")
+            singular_indices = np.nonzero(mask)
+            mask = np.logical_not(np.isclose(determinants, 0.0))
+            # Calculate features-targets correlations for all the data sets
+            correlations = np.transpose(data[:,:,:-1], axes = (0,2,1))@data[:,:,-1:]
+            parameters[mask] = np.linalg.solve(Sigma_tensor[mask,:,:], correlations[mask])
+            
+            # Least squares solution 
+            for index in singular_indices[0]:
+                parameters[index] = np.linalg.lstsq(Sigma_tensor[index,:,:], correlations[index])[0]
+        
+            
+        else:
+            pass
+        
+        return parameters 
+        
+    def calculate_predictive_error(self, test_data, model_params):
+        pass 
+    
+    
+        
+        
