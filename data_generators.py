@@ -342,10 +342,10 @@ class ContinuousGenerator():
             z = self.coefs[0]*xx + self.coefs[1]*yy
             ax.plot_surface(xx,yy,z,alpha=0.2)
             ax.scatter(self.features[:,0], self.features[:,1], self.targets[:])
-            for angle in range(0, 360):
-                ax.view_init(30, angle)
-                plt.draw()
-                plt.pause(.001)    
+#            for angle in range(0, 360):
+#                ax.view_init(30, angle)
+#                plt.draw()
+#                plt.pause(.001)    
         else:
             # TODO: Error handling 
             pass
