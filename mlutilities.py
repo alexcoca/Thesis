@@ -104,4 +104,4 @@ def bound_records_norm(X):
     # Divide each row by the max row norm to obtain X
     X = X / max_row_norm    
     
-    return X
+    return X, max_row_norm
