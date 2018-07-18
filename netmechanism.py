@@ -339,9 +339,13 @@ class OutcomeSpaceGenerator(FileManager):
         if self.scaling_const == 0:
             raise ValueError("Scaling constant has not been calculated!")
         
+        # Print some batch numbers to check progress
+        if batch_index % 500 == 0:
+            print("Generating batch", batch_index)
+        
         # Generate a batch of combinations according to the batch_index
         batch = itertools.islice(itertools.combinations(range(self.synth_features.shape[0]),self.dimensionality), \
-                                     (batch_index)*self.batch_size,(batch_index+1)*self.batch_size)
+                                     (batch_index)*self.batch_size, (batch_index + 1)*self.batch_size)
 
         # Evaluate utility - note that exponential is not taken as sum-exp trick is implemented to 
         # evalute the scores in a numerically stable way during the sampling stage
@@ -933,7 +937,54 @@ class SyntheticDataGenerator(FileManager):
                 print ("Synthethic target space initialised")
         else:
             self.synthetic_targets = self.load_lattice(self.target_latt_path)
+    
+    def calculate_accuracy(self):
+        
+        # Calculate empirical covariance and correlation for the synthetic data sets.
+        # Each data set is a member of the tensor @self.synthetic_datasets
+        emp_cov_synth = 1/self.dimensionality * np.transpose(self.synthetic_datasets[:,:,:-1], axes = (0,2,1))@self.synthetic_datasets[:,:,:-1]
+        emp_corr = 1/self.dimensionality * np.transpose(self.synthetic_datasets[:,:,:-1], axes = (0,2,1))@self.synthetic_datasets[:,:,-1:]
+        
+        # Calculate differences between private data empirical covariance and feature/targets correlation and
+        # their synthetic counterparts
+        delta_cov = self.outcome_space.F_tilde_x[:,:-1] - emp_cov_synth
+        delta_corr = self.outcome_space.F_tilde_x[:,-1:] - emp_corr
 
+        # Calculate norms of the differences 
+        delta_cov_norms_f = np.linalg.norm(delta_cov, ord = 'fro', axis = (1,2))
+        delta_cov_norms_2 = np.linalg.norm(delta_cov, ord = 2, axis = (1,2))
+        delta_corr_norms_2 = np.linalg.norm(delta_corr, ord = 2, axis = 1)
+
+        # Calculate average and standard deviation of the norm of the differences
+        avg_f_norm_cov = np.mean(delta_cov_norms_f)
+        avg_2_norm_cov = np.mean(delta_cov_norms_2)
+        std_f_norm_cov = np.std(delta_cov_norms_f)
+        std_2_norm_cov = np.std(delta_cov_norms_2)
+        avg_2_norm_corr = np.mean(delta_corr_norms_2)
+        std_2_norm_corr = np.std(delta_corr_norms_2)
+        
+        # Calculate the minimum between the Frobenius norm of the empirical 
+        # covariance matrix difference and the 2-norm of the feature-targets 
+        # correlations difference along with its mean and std
+        min_delta_norm = np.minimum(delta_cov_norms_f[:,np.newaxis], delta_corr_norms_2)
+        min_delta_norm_avg = np.mean(min_delta_norm)
+        min_delta_norm_std = np.std(min_delta_norm)
+        
+        # Save the data
+        self.sampling_parameters['delta_cov_norms_f'] = delta_cov_norms_f
+        self.sampling_parameters['delta_cov_norms_2'] = delta_cov_norms_2
+        self.sampling_parameters['delta_corr_norms_2'] = delta_corr_norms_2
+        self.sampling_parameters['avg_f_norm_cov'] = avg_f_norm_cov
+        self.sampling_parameters['avg_2_norm_cov'] = avg_2_norm_cov
+        self.sampling_parameters['avg_2_norm_corr']  = avg_2_norm_corr       
+        self.sampling_parameters['std_f_norm_cov'] = std_f_norm_cov
+        self.sampling_parameters['std_2_norm_cov'] = std_2_norm_cov
+        self.sampling_parameters['std_2_norm_corr'] = std_2_norm_corr
+        self.sampling_parameters['min_delta_norm'] = min_delta_norm
+        self.sampling_parameters['min_delta_norm_avg'] = min_delta_norm_avg
+        self.sampling_parameters['min_delta_norm_std'] = min_delta_norm_std
+        
+        
     def generate_data(self, property_preserved):
         
         # Set property preserved 
@@ -945,19 +996,33 @@ class SyntheticDataGenerator(FileManager):
                                 "nf" + str(self.num_points_features)
         
         # Generate outcomes and compute their scores
+        t_start = time.time()
         self.outcome_space.generate_outcomes(experiment_name = experiment_name, synth_features = self.synthetic_features, \
                                              synth_targets = self.synthetic_targets, private_data = self.private_data,\
-                                             property_preserved = self.property_preserved, privacy_constant = self.epsilon)        
+                                             property_preserved = self.property_preserved, privacy_constant = self.epsilon)    
+        t_end = time.time()
+        t_generation = t_end - t_start
+        print("Generation time", t_generation)
         # Sample the outcome space
+        t_start = time.time()
         self.sampler.sample(directory = self.outcome_space.directory, filenames = self.outcome_space.filenames,\
                             batch_size = self.outcome_space.batch_size, partition_function = self.outcome_space.partition_function, \
                             cumulative_partition = self.outcome_space.cumulative_partition, max_scaled_utility = self.outcome_space.max_scaled_utility, \
                             dimensionality = self.dimensionality, synth_features = self.synthetic_features, synth_targets = self.synthetic_targets, \
                             property_preserved = self.property_preserved, F_tilde_x = self.outcome_space.F_tilde_x, scaling_const = self.outcome_space.scaling_const,\
                             seed = self.seed, basename = self.outcome_space.basename, experiment_name = experiment_name, save_data = self.outcome_space.save_data)
+        t_end = time.time()
+        t_sampling = t_end - t_start
+        print("Sampling time", t_sampling)
         # Return sampled values
         self.sampling_parameters = self.sampler.sampling_parameters
-        self.synthetic_datasets = self.sampler.sampled_data_sets
+        self.sampling_parameters['tgen'] = t_generation
+        self.sampling_parameters['tsamp'] = t_sampling
+        self.synthetic_datasets = np.array(self.sampler.sampled_data_sets)
+        
+        # Assess approximation quality
+        self.calculate_accuracy()
+        
         self.save_synthetic_data(self.synthetic_datasets, self.sampler.directory, experiment_name)
         # print ("The sampled datasets are", self.synthetic_datasets)
 
