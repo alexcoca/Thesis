@@ -264,7 +264,7 @@ class ContinuousGenerator():
         
         # Sample coefficients
         self.coefs = (upper_bound - lower_bound)*np.random.random((self.d, 1)) + lower_bound
-        
+
         # Sample features and normalise them s.t. their 2-norm is <=1
         self.features = np.random.normal(loc = self.mean, scale = self.variance, size = (self.n, self.d))
         if bound_recs == True:
