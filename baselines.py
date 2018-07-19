@@ -83,21 +83,21 @@ class Regression():
     
     def __init__(self):
         self.parameters = []
+        self.singular_indices = []
     
     def fit_data(self, data):
         
         if len(data.shape) > 2:
             
             parameters = np.zeros(shape = (*data.shape[:-1],1))
-            
-            # Determine if there are any singular synthetic matrices
-            
+                        
             # Calculate empirical covariance matrix for all the data sets
             Sigma_tensor = np.transpose(data[:,:,:-1], axes = (0,2,1))@data[:,:,:-1] 
+            # Determine if there are any singular synthetic matrices
             determinants = np.linalg.det(Sigma_tensor)
             mask = np.isclose(determinants, 0.0)
             if np.any(mask):
-                print("Warning, there were singular matrices")
+                print("Warning, there were singular sythethic matrices")
             singular_indices = np.nonzero(mask)
             mask = np.logical_not(np.isclose(determinants, 0.0))
             # Calculate features-targets correlations for all the data sets
@@ -107,16 +107,29 @@ class Regression():
             # Least squares solution 
             for index in singular_indices[0]:
                 parameters[index] = np.linalg.lstsq(Sigma_tensor[index,:,:], correlations[index])[0]
-        
+                
+            self.singular_indices = singular_indices
             
         else:
-            pass
+            raise NotImplementedError
         
         return parameters 
         
-    def calculate_predictive_error(self, test_data, model_params):
-        pass 
-    
+    def calculate_predictive_error(self, test_data, model_parameters):
+        
+        if len(model_parameters.shape) > 2:
+            
+            # Calculate targets
+            tmp = np.tile(test_data[:,:-1],[model_parameters.shape[0], 1, 1])*\
+                                np.transpose(model_parameters, axes = (0, 2, 1))
+            predicted_targets = np.sum(tmp, axis = 2, keepdims = True)
+            
+            rms_errors = np.sqrt((1/test_data.shape[0])*np.sum((test_data[:,-1:] - predicted_targets)**2, axis = 1))
+            
+        else:
+            raise NotImplementedError
+            
+        return rms_errors
     
         
         
