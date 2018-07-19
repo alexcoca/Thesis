@@ -37,7 +37,7 @@ def second_order_moment_experiment(dimensionality = 2, num_records = 20, batch_s
                                            seed = seed)
      
     t_start = time.time()
-    SyntheticData.generate_data(property_preserved = 'second_moments')
+    results = SyntheticData.generate_data(property_preserved = 'second_moments')
     t_end = time.time()
     
     if parallel == True:
@@ -46,8 +46,8 @@ def second_order_moment_experiment(dimensionality = 2, num_records = 20, batch_s
         print("Elapsed time without parallelisation is " + str(t_end - t_start))
     
     # Synthetic data 
-    synthetic_data_integrated = SyntheticData.synthetic_datasets
-    return synthetic_data_integrated
+    # synthetic_data_integrated = SyntheticData.synthetic_datasets
+    return results
     
     
 ## Sample more data 
@@ -66,22 +66,27 @@ def second_order_moment_experiment(dimensionality = 2, num_records = 20, batch_s
 
 if __name__ == '__main__':
      # Define experiment parameters
-    dimensionality = 3
+    dimensionality = 2
     num_records = 20
-    batch_size = 7500
-    directory = '/homes/ac2123/Thesis'
+    batch_size = 10
+    # directory = '/homes/ac2123/Thesis'
+    directory = 'D:/Thesis/Experiments'
     parallel = True
     save_data = False
     partition_method = 'fast_2'
     workers = -1
-    num_samples = 25
+    num_samples = 100
     sample_parallel = True
     load_data = False
-    num_points_targets = 10
-    num_points_features = 10
+    num_points_targets = 20
+    num_points_features = 20
     epsilon = 0.1
     seed = 23
-    result = second_order_moment_experiment()
+    data = second_order_moment_experiment(dimensionality = dimensionality, num_records = num_records, batch_size = batch_size, \
+                                            directory = directory, parallel = parallel, save_data = save_data, partition_method = partition_method, \
+                                            workers = workers, num_samples= num_samples, sample_parallel = sample_parallel, load_data = load_data, \
+                                            num_points_targets = num_points_targets, num_points_features = num_points_features, epsilon = epsilon, \
+                                            seed = seed)
 
 
 

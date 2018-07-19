@@ -4,6 +4,7 @@ Created on Fri Jun 15 11:51:56 2018
 
 @author: alexc
 """
+# import pdb 
 import math
 import numpy as np
 from sympy.utilities.iterables import multiset_permutations
@@ -17,8 +18,8 @@ import time
 from netmechanism_helpers import FileManager
 
 from multiprocessing import Pool
-#import multiprocessing.util as util
-#util.log_to_stderr(util.SUBDEBUG)
+# import multiprocessing.util as util
+# util.log_to_stderr(util.SUBDEBUG)
 
 class FeaturesLattice(FileManager):
     
@@ -279,7 +280,7 @@ class OutcomeSpaceGenerator(FileManager):
         # Results storage    
         self.batch_results = [] # Stores the max_score and the matrix containing the scores for that batch
         self.partition_function = 0
-        self.cumlative_partition = []
+        self.cumulative_partition = []
         self.max_scaled_utility = 0
         
         #Miscellaneous
@@ -372,6 +373,13 @@ class OutcomeSpaceGenerator(FileManager):
         
         # Max. utility is calculated in order to implement exp-normalise trick
         max_scaled_util = np.max(scaled_utilities_batch)
+        # Use a shared memory array to compute maximum scaled utility
+#        if self.parallel:
+#            print ("DEBUG: self.max_scaled_utility.value", self.max_scaled_utility.value)
+#            if max_scaled_util > self.max_scaled_utility.value:
+#                print ("self.max_scaled_utility values", self.max_scaled_utility.value)
+#                print ("Comp succeeded")
+#                self.max_scaled_utility.value = max_scaled_util
         
         partial_sum = np.sum(np.exp(scaled_utilities_batch))
 
@@ -383,12 +391,12 @@ class OutcomeSpaceGenerator(FileManager):
         elif self.partition_method == 'fast':
             return (max_scaled_util, scaled_utilities_batch)
         elif self.partition_method == 'fast_2': 
-            return partial_sum
+            return max_scaled_util, partial_sum
     
     def calculate_max_scaled_utility(self, results):
-        max_scaled_utility = functools.reduce((lambda x,y: max(x, y)), results)
+        max_scaled_utility = functools.reduce((lambda x, y: max(x, y)), results)
         self.max_scaled_utility = max_scaled_utility
-        print ("Max_scaled_utility is", max_scaled_utility)    
+        print ("Max scaled utility is", max_scaled_utility)    
     
     def calculate_partition_function(self, results = [], partition_method = 'fast_2'):
         ''' Calculates the partition function. If @method is 'fast' then the partition function is 
@@ -468,12 +476,15 @@ class OutcomeSpaceGenerator(FileManager):
             
             print ("Partition function is", str(partition_function))
             print ("Max_scaled_utility is", max_scaled_utility)
-     
+        
         elif partition_method == 'fast_2':
             
-            self.cumulative_partition = np.cumsum(list(results))
+            results = np.array(list(results))
+            self.cumulative_partition = np.cumsum(results[:, 1])
+            self.max_scaled_utility = np.max(results[:, 0])
             self.partition_function = self.cumulative_partition[-1]
-            print ("Partition function is", str(self.partition_function))
+            print ("Partition function is", self.partition_function)
+            print ("Max scaled utility is", self.max_scaled_utility)
 
     def generate_outcomes(self, experiment_name = '', synth_features = [], synth_targets = [],\
                           private_data = [], property_preserved = 'second_moments', privacy_constant = 0.1):        
@@ -527,16 +538,26 @@ class OutcomeSpaceGenerator(FileManager):
                 self.calculate_partition_function(partition_method = self.partition_method)
         else:
             self.generate_outcomes_parallel()
-    
+            
+#    def initProcess(self, max_scaled_utility):
+#            evaluate_sample_score.max_scaled_utility = Value('d', max_scaled_utility) 
+            
     def generate_outcomes_parallel(self):
-        # TODO: make sure filenames is set correctly so the Sampler still works 
+        
+        
+        # Declare a variable in shared memory so that the max scaled utility can
+        # be computed as the outcomes are generated
+               
         print("Number of batches is ", self.n_batches)
         print("Starting parallel pool")
         if self.workers == -1:
             self.workers = os.cpu_count()
+        # pool = Pool(self.workers, initializer = self.initProcess, initargs = (math.inf, ))
+        #manager = Manager()
+        #self.max_scaled_utility = manager.Value('d', math.inf)
         pool = Pool(self.workers)
         try:
-            results = pool.imap(self.evaluate_sample_score,range(self.n_batches))
+            results = pool.imap(self.evaluate_sample_score, range(self.n_batches))
             pool.close() # prevent further tasks from being submitted to the pool. Once all tasks have been
             # completed the worker processes will exit
             pool.join() # wait for the worker processes to exit. One must call close() before using join()
@@ -544,13 +565,11 @@ class OutcomeSpaceGenerator(FileManager):
             time.sleep(1)
             last_batch = self.get_last_batch_id()
             print ("Ran out of memory at batch", last_batch)
-#            further_results = pool.imap(self.evaluate_sample_score,range(last_batch,self.n_batches,1))
-#            pool.close()
-#            pool.join()
-        print("Outcome space generation parallel pool execution complete")
+            print("Outcome space generation parallel pool execution complete")
         if self.save_data:
             self.filenames = glob.glob(self.directory + "/*")
         self.calculate_partition_function(results = results, partition_method = self.partition_method)
+        # print ("Max scaled utility", self.max_scaled_utility)
         
 class Sampler(FileManager):
     def __init__(self, directory = '', filenames = [], num_samples = 5, n_batches = 0, partition_method = 'fast', seed = 23,\
@@ -593,6 +612,12 @@ class Sampler(FileManager):
         self.experiment_name = ''
         self.cumulative_partition = []
         self.save_data = True
+        self.sample_scores = np.zeros(shape = (1, num_samples))
+        self.sample_utilities = np.zeros(shape = (1, num_samples))
+        self.sample_scores_avg = 0.0
+        self.sample_scores_std = 0.0
+        self.sample_utilities_avg = 0.0
+        self.sample_utilities_std = 0.0
         
         # If the Sampler() is instanstiated just to draw more samples for a 
         # previous experiment, the sampling parameters are passed to the object
@@ -673,12 +698,16 @@ class Sampler(FileManager):
         col_indices = []
         for i in range(len(row_indices)):
             col_index = np.searchsorted(np.cumsum(scores[row_indices[i],:]), rescaled_partitions[i])
-            if  col_index > 0:
-                col_indices.append(col_index - 1)
+            if col_index > max_col_idx:
+                col_indices.append(0)
+                row_indices[i] = row_indices[i] + 1
             else:
-                col_indices.append(max_col_idx)
-                row_indices[i] = row_indices[i] - 1
-                
+                col_indices.append(col_index)
+#            if  col_index > 0:
+#                col_indices.append(col_index - 1)
+#            else:
+#                col_indices.append(max_col_idx)
+#                row_indices[i] = row_indices[i] - 1
                 
         return (row_indices,col_indices)
     
@@ -697,11 +726,11 @@ class Sampler(FileManager):
         row_indices, col_indices = self.get_sample_coordinates(scores,[partition_residual])
         # Return the sample indices
         for batch_idx, row_idx, col_idx in zip([batch_index]*len(row_indices), row_indices, col_indices):
-            if int(row_idx) == 0 and int(col_idx) == 0:
-                sample_index = (batch_idx - 1, max_row_idx, max_col_idx)
-            else:
-                sample_index = (batch_idx, int(row_idx), int(col_idx))        
-        return sample_index 
+#            if int(row_idx) == 0 and int(col_idx) == 0:
+#                sample_index = (batch_idx - 1, max_row_idx, max_col_idx)
+#            else:
+            sample_index = (batch_idx, int(row_idx), int(col_idx))        
+        return (sample_index, scores[int(row_idx), int(col_idx)]) 
     
     def get_samples_parallel(self, batches_partitions):
         print ("Starting parallel sampling procedure")
@@ -717,6 +746,9 @@ class Sampler(FileManager):
         def get_batch_id(filename):
             return int(filename[filename.rfind("_") + 1: ])
         
+        if raw_partition_function == 0:
+            raise ValueError("Partition value cannot be zero")
+        
         # Sort filenames to ensure correct access of stored data
         filenames  = sorted(filenames, key = get_batch_id)
         
@@ -725,7 +757,6 @@ class Sampler(FileManager):
         
         # Obtain cumulative partition function - needs to be a numpy array in the actual implementation
         batches = np.searchsorted(cumulative_partition, scaled_partitions)
-        
         # Shrink partitions to account for the contribution of all previous batches
         scaled_partitions[batches >= 1] = scaled_partitions[batches >= 1] - cumulative_partition[batches[batches >= 1] - 1]
         # This is necessary so that the matrix recovery proceducre can work in general
@@ -765,16 +796,31 @@ class Sampler(FileManager):
                 row_indices, col_indices = self.get_sample_coordinates(scores, batch_dictionary[key])
                 # Add index tuples to the samples list
                 for batch_idx, row_idx, col_idx in zip([key]*len(row_indices), row_indices, col_indices):
-                    if int(row_idx) == 0 and int(col_idx) == 0:
-                        sample_indices.append((batch_idx - 1, max_row_idx, max_col_idx))
-                    else:
-                        sample_indices.append((batch_idx, int(row_idx), int(col_idx)))
+#                    if int(row_idx) == 0 and int(col_idx) == 0:
+#                        sample_indices.append((batch_idx - 1, max_row_idx, max_col_idx))
+#                    else:
+                    sample_indices.append((batch_idx, int(row_idx), int(col_idx)))
         else:
             # TODO: Make parallel version work with multiple samples from the same batch
             # Task 1: Build hash table (? could simply put the if else statement a few lines down)
             # and convert to list of tuples (batch, [partition_residuals])
             batches_partitions = zip(batches,scaled_partitions)
-            sample_indices = self.get_samples_parallel(batches_partitions)
+            res = self.get_samples_parallel(batches_partitions)
+            # Unpack sample indices from a list of the form [((a,b,c),score),((d,e,f),score)]
+            sample_indices = [elem for elem in list(zip(*res))[0]]
+            # Unpack sample scores and calculate their mean and std
+            self.sample_scores = np.array(list(zip(*res))[1])
+            self.sample_scores_avg = np.mean(self.sample_scores)
+            self.sample_scores_std = np.std(self.sample_scores)
+            # Calculate the mean and std of the utilities
+            self.sample_utilities = 1/self.scaling_const*np.log(self.sample_scores)
+            self.sample_utilities_avg = np.mean(self.sample_utilities)
+            self.sample_utilities_std = np.std(self.sample_utilities)
+#            print ("DEBUG: self.sample_scores", self.sample_scores)
+#            print ("DEBUG:", self.sample_utilities)
+#            print ("DEBUG:", self.sample_utilities_avg)
+#            print ("DEBUG:", self.sample_utilities_std)
+            
             print("Parallel sampling procedure complete")
         self.sample_indices = sample_indices
                 
@@ -845,7 +891,7 @@ class Sampler(FileManager):
             self.experiment_name = experiment_name
             self.cumulative_partition = cumulative_partition
             self.save_data = save_data
-        
+        print ("DEBUG: partition function", self.partition_function)
         self.sample_datasets(self.num_samples, self.filenames, self.partition_function, cumulative_partition)
         self.recover_synthetic_datasets(self.sample_indices)
         self.pack_arguments()
@@ -983,7 +1029,17 @@ class SyntheticDataGenerator(FileManager):
         self.sampling_parameters['min_delta_norm'] = min_delta_norm
         self.sampling_parameters['min_delta_norm_avg'] = min_delta_norm_avg
         self.sampling_parameters['min_delta_norm_std'] = min_delta_norm_std
-        
+        self.sampling_parameters['sample_scores'] = self.sampler.sample_scores
+        self.sampling_parameters['sample_scores_avg'] = self.sampler.sample_scores_avg
+        self.sampling_parameters['sample_scores_std'] = self.sampler.sample_scores_std
+        self.sampling_parameters['sample_utilities'] = self.sampler.sample_utilities
+        self.sampling_parameters['sample_utilities_avg'] = self.sampler.sample_utilities_avg
+        self.sampling_parameters['sample_utilities_std'] = self.sampler.sample_utilities_std
+        self.sampling_parameters['max_scaled_utility'] = self.outcome_space.max_scaled_utility
+        self.sampling_parameters['max_utility'] = self.outcome_space.max_scaled_utility*1/self.outcome_space.scaling_const
+        self.sampling_parameters['coeffs'] = self.private_data.coefs
+        self.sampling_parameters['test_set'] = self.private_data.test_data
+        print ("Max utility", self.sampling_parameters['max_utility'])
         
     def generate_data(self, property_preserved):
         
@@ -1025,6 +1081,8 @@ class SyntheticDataGenerator(FileManager):
         
         self.save_synthetic_data(self.synthetic_datasets, self.sampler.directory, experiment_name)
         # print ("The sampled datasets are", self.synthetic_datasets)
+        
+        return self.sampling_parameters
 
 def est_outcome_space_size(N, d, k, covariance_only = False):
     '''This function estimates the size of the outcome space as a function of:
