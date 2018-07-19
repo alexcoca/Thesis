@@ -169,6 +169,37 @@ def line_counter(path):
     # Create a (total_count,details) tuple
     return (sum(counts),list(zip(counts,names)))
 
+def check_sampling_deprecated (sample_indices_set, results, max_score):
+    """ Given a set of sample indices, @sample_indices_set, represented as a tuple with
+    structure (batch_index, row_index, column_index,scaled_partition_function), this function uses the raw algorithm 
+    results to calculate the smallest postive "residual" of the partition function by subtracting
+    each score from the scaled_partition_function with coordinates <= (batch_index,row_idx,col_idx). The test checks whether
+    incrementing col_idx by 1 results in a negative partition function. If this is the case, then the sampling is correct.
+    
+    Notes: Raw results are represented as a tuple where the first element is max_score for the particular batch and the second 
+    is a matrix containing the eponents of the Gibbs distribution - hence np.sum(np.exp(scores-max_score)) is applied to calculate 
+    the scores exactly"""
+    
+    partition_residuals = []
+    
+    
+    #for sample_indices in sample_indices_set:
+    for batch, row_idx, col_idx, partition_function in sample_indices_set:
+        
+       #  print("Checking scaled partition", partition_function)
+        if batch == 0:
+            partition_residuals.append( partition_function - np.sum(np.exp(results[batch][1]-max_score).flatten()[0:((row_idx)*(results[batch][1].shape[1]) + col_idx)]) )
+            print ("Batch is 0, partition_residual", partition_residuals [-1])
+        else:
+            for index in range(batch):
+                partition_function = partition_function - np.sum(np.exp(results[index][1] - max_score))
+         #   print ("After subtracting batch contribution", partition_function) 
+            partition_function = partition_function - np.sum( np.exp(results[batch][1] - max_score).flatten()[0:((row_idx)*(results[batch][1].shape[1]) + col_idx + 1)] )
+         #   print ("After subtracting rows and columns contribution", partition_function)
+            partition_residuals.append(partition_function)  
+        
+    return partition_residuals
+
 def check_sampling (sample_indices_set, results, max_score):
     """ Given a set of sample indices, @sample_indices_set, represented as a tuple with
     structure (batch_index, row_index, column_index,scaled_partition_function), this function uses the raw algorithm 
@@ -186,16 +217,16 @@ def check_sampling (sample_indices_set, results, max_score):
     #for sample_indices in sample_indices_set:
     for batch, row_idx, col_idx, partition_function in sample_indices_set:
         
-        print("Checking scaled partition", partition_function)
+       #  print("Checking scaled partition", partition_function)
         if batch == 0:
-            partition_residuals.append( partition_function - np.sum(np.exp(results[batch][1]-max_score).flatten()[0:((row_idx)*(results[batch][1].shape[1]) + col_idx)]) )
-            print ("Batch is 0, partition_residual", partition_residuals [-1])
+            partition_residuals.append( partition_function - np.sum(np.exp(results[batch][1] - max_score).flatten()[0:((row_idx)*(results[batch][1].shape[1]) + col_idx + 1)]) )
+            print ("Batch is 0, partition_residual", partition_residuals [-1]) 
         else:
             for index in range(batch):
                 partition_function = partition_function - np.sum(np.exp(results[index][1]-max_score))
-            print ("After subtracting batch contribution", partition_function) 
+            # print ("After subtracting batch contribution", partition_function) 
             partition_function = partition_function - np.sum( np.exp(results[batch][1] - max_score).flatten()[0:((row_idx)*(results[batch][1].shape[1]) + col_idx + 1)] )
-            print ("After subtracting rows and columns contribution", partition_function)
+            # print ("After subtracting rows and columns contribution", partition_function)
             partition_residuals.append(partition_function)  
         
     return partition_residuals

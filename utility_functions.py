@@ -28,21 +28,21 @@ def compute_second_moment_utility(targets, outcomes, dim, scaling_const, F_tilde
             
     # f_r_tensor is expanded such that each component matrix is split into a tensor containing each
     # row transposed (a p x dim x 1 tensor, p is the number of targets)
-    f_r_expand = f_r_tensor.reshape(tuple([*f_r_tensor.shape,1]))
+    f_r_expand = f_r_tensor.reshape(tuple([*f_r_tensor.shape, 1]))
     
     # F_r_tensor needs to be expanded such that each row of the corresponding entry in
     # f_r_tensor is appended as its last column and thus form all possible F_rs given a synethethic matrix Xh.
     # Hence each matrix in F_r is repeated p times to form a tensor (of p x d x d), where p is the number of rows of the 
     # corresponding YhXh matrix in f_r_tensor (which is = to the number of targets)
-    F_r_expand = np.repeat(F_r_tensor,repeats=targets.shape[0],axis=0).reshape(F_r_tensor.shape[0],-1,*F_r_tensor[0].shape)
+    F_r_expand = np.repeat(F_r_tensor,repeats=targets.shape[0], axis = 0).reshape(F_r_tensor.shape[0],-1,*F_r_tensor[0].shape)
     
     # The concatenation results in a (b x p x d x d+1) tensor where p is the number of possible targets and b is the
     # batch size. This tensor is subtracted from f_tilde and reduced to obtain an a matrix of dimension batch_size x p 
-    F_tilde_r = np.concatenate((F_r_expand,f_r_expand),axis=3)
+    F_tilde_r = np.concatenate((F_r_expand,f_r_expand), axis = 3)
     
     # Utilities for the particular batch are returned as a matrix of dimension batch_size x p where p is the number of 
     # synthetic targets. Exp-normalise trick is implemented so the exponentiation is done in the sampling step
-    scaled_utilities = - scaling_const*np.max(np.abs(F_tilde_x-F_tilde_r), axis=(3,2))
+    scaled_utilities = - scaling_const*np.max(np.abs(F_tilde_x-F_tilde_r), axis = (3,2))
     
     return scaled_utilities
 
