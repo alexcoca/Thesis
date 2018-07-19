@@ -290,3 +290,36 @@ def sample_datasets(self, num_samples, filenames, raw_partition_function, cumula
         
         self.sample_indices = sample_indices
     
+# 18/07/2018: Sampling algorithm from net mechanism (incorrect...)
+        
+        
+def get_sample_coordinates(self, scores, partition_residuals):
+    
+    max_col_idx = scores.shape[1] - 1
+    # Calculate the cumulative scores
+    cum_scores = np.cumsum(np.sum(scores, axis = 1))     
+    # Find the rows in the score matrix
+    row_indices = np.searchsorted(cum_scores, partition_residuals)
+    
+    # Rescale partitions to account for the contribution of rows
+    rescaled_partitions = np.zeros(shape=(len(row_indices,)))
+    rescaled_partitions[row_indices >= 1] = np.array(partition_residuals)[row_indices >= 1] - \
+                                            cum_scores[row_indices[row_indices >= 1] - 1]
+    if np.any(row_indices < 1):
+        rescaled_partitions[row_indices < 1] = np.array(partition_residuals)[row_indices < 1]
+        
+    # Determine the column index for each partition residual in the corresponding row
+    col_indices = []
+    for i in range(len(row_indices)):
+        col_index = np.searchsorted(np.cumsum(scores[row_indices[i],:]), rescaled_partitions[i])
+        if  col_index > 0:
+            col_indices.append(col_index - 1)
+        else:
+            col_indices.append(max_col_idx)
+            row_indices[i] = row_indices[i] - 1
+            
+            
+    return (row_indices,col_indices)
+
+
+
