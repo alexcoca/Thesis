@@ -430,7 +430,7 @@ from data_generators import ContinuousGenerator
 import time
 import pickle,os, glob
 import testutilities
-from baselines import Regression
+from baselines import Regression, DPRegression
 
 def get_private_F_tilde (private_data):
     
@@ -943,7 +943,6 @@ def sample_datasets_new(num_samples, filenames, raw_partition_function, seed):
     # For each batch, load the data and calculate the row index
     for key in batch_dictionary.keys():
         scores = testutilities.retrieve_scores(filenames, batches= [key])[0]['scores']
-        max_row_idx = scores.shape[0] - 1
         max_col_idx = scores.shape[1] - 1
         # Calculate the cumulative scores
         cum_scores = np.cumsum(np.sum(scores, axis = 1))        
@@ -1243,12 +1242,26 @@ print("Accuracies of alternative sampling implementation")
 calculate_accuracy(synthetic_data_sets_alternative, dim, F_tilde_x)
 
 # Check regression results
-regressor_original = Regression()
+netmech_regressor = Regression()
 # regressor_alternative = Regression()
 
-param = regressor_original.fit_data(synthetic_data_sets)
-predictive_err = regressor_original.calculate_predictive_error(private_data.test_data, param)
-print ("Predictive_errors", predictive_err)
+param = netmech_regressor.fit_data(synthetic_data_sets)
+predictive_err_netmech = netmech_regressor.calculate_predictive_error(private_data.test_data, param)
+#print ("Predictive_errors for net mechanism", predictive_err_netmech)
+print ("Min predictive error net mechanism", np.min(predictive_err_netmech))
+print ("Mean predictive error net mechanism", np.mean(predictive_err_netmech))
+print ("Std of predictive err net mechanism", np.std(predictive_err_netmech))
+
+# Fit pamaters with ADASSP algorithm
+
+adassp_regressor = DPRegression()
+adassp_reg_coef = adassp_regressor.get_parameters(private_data.features, private_data.targets, num_samples, epsilon)
+predictive_err_adassp = Regression().calculate_predictive_error(private_data.test_data, adassp_reg_coef)
+# print ("Predictive_errors for adassp", predictive_err_adassp)
+print ("Min predictive error adassp", np.min(predictive_err_adassp))
+print ("Mean predictive error adassp", np.mean(predictive_err_adassp))
+print ("Std of predictive err adassp", np.std(predictive_err_adassp))
+
 # param_alternative = regressor_alternative.fit_data(synthetic_data_sets_alternative)
 # param_alternative_2 = regressor_alternative2.fit_data(synthetic_data_sets_alternative_2)
 
