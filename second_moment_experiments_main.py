@@ -13,14 +13,14 @@ import time
 # import multiprocessing.util as util
 # util.log_to_stderr(util.SUBDEBUG)
 
-def second_order_moment_experiment(dimensionality = 2, num_records = 20, batch_size = 7500, directory = '',\
+def second_order_moment_experiment(dimensionality = 2, num_records = 20, test_frac = 0.5, batch_size = 7500, directory = '',\
                                    parallel = True, save_data = False, partition_method = 'fast_2', workers = -1, \
                                    num_samples = 25, samples_only = False, sample_parallel = True, load_data = False,\
                                    num_points_targets = 10, num_points_features = 10, epsilon = 0.1, seed = 23):
     # Initialise private_data object
     # '__spec__' = None
     private_data = ContinuousGenerator(d = dimensionality, n = num_records)
-    private_data.generate_data()
+    private_data.generate_data(test_frac = test_frac)
     
     # Initialise OutcomeSpaceGenerator()
     OutcomeSpace = OutcomeSpaceGenerator(directory = directory, batch_size = batch_size, parallel = parallel,\
@@ -67,16 +67,17 @@ def second_order_moment_experiment(dimensionality = 2, num_records = 20, batch_s
 if __name__ == '__main__':
      # Define experiment parameters
     dimensionality = 2
-    num_records = 20
-    batch_size = 10
+    num_records = 40
+    test_frac = 0.5
+    batch_size = 250
     # directory = '/homes/ac2123/Thesis'
     directory = 'D:/Thesis/Experiments'
-    parallel = True
+    parallel = False
     save_data = False
     partition_method = 'fast_2'
     workers = -1
     num_samples = 100
-    sample_parallel = True
+    sample_parallel = False
     load_data = False
     num_points_targets = 20
     num_points_features = 20

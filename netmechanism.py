@@ -618,6 +618,7 @@ class Sampler(FileManager):
         self.sample_scores_std = 0.0
         self.sample_utilities_avg = 0.0
         self.sample_utilities_std = 0.0
+        self.recovered_combinations = []
         
         # If the Sampler() is instanstiated just to draw more samples for a 
         # previous experiment, the sampling parameters are passed to the object
@@ -656,13 +657,13 @@ class Sampler(FileManager):
                                     'synth_targets': self.synth_targets,'dimensionality': self.dimensionality, \
                                     'load_data': self.load_data, 'sampled_indices': self.sample_indices, 'F_tilde_x': self.F_tilde_x, \
                                     'scaling_const': self.scaling_const, 'experiment_name': self.experiment_name, \
-                                    'cumulative_partition': self.cumulative_partition}
+                                    'cumulative_partition': self.cumulative_partition, 'recovered_combinations': self.recovered_combinations}
         
         if self.load_data:
             self.sampling_parameters['directory'] =  self.directory
             self.sampling_parameters['filenames'] =  self.filenames,
-        path = self.basename + "/" + self.experiment_name + "/SamplingLog/"
-        self.save(self.sampling_parameters, path, self.experiment_name)
+        #path = self.basename + "/" + self.experiment_name + "/DataLog/"
+        #self.save(self.sampling_parameters, path, self.experiment_name)
         
     def generate_batch(self, batch_index):
         
@@ -719,16 +720,11 @@ class Sampler(FileManager):
         
         # Reconstruct the scores matrix
         scores = np.exp(self.generate_batch(batch_index))
-        max_row_idx = scores.shape[0] - 1
-        max_col_idx = scores.shape[1] - 1
         # Find how many elements of the scores matrix have to be subtracted from
         # the partition residual to obtain its smallest positive value
-        row_indices, col_indices = self.get_sample_coordinates(scores,[partition_residual])
+        row_indices, col_indices = self.get_sample_coordinates(scores, [partition_residual])
         # Return the sample indices
         for batch_idx, row_idx, col_idx in zip([batch_index]*len(row_indices), row_indices, col_indices):
-#            if int(row_idx) == 0 and int(col_idx) == 0:
-#                sample_index = (batch_idx - 1, max_row_idx, max_col_idx)
-#            else:
             sample_index = (batch_idx, int(row_idx), int(col_idx))        
         return (sample_index, scores[int(row_idx), int(col_idx)]) 
     
@@ -745,6 +741,13 @@ class Sampler(FileManager):
         
         def get_batch_id(filename):
             return int(filename[filename.rfind("_") + 1: ])
+        
+        def get_stats():
+            'Calculates the average and standard deviation of the sampled scores&utilities '
+            self.sample_scores_avg = np.mean(self.sample_scores)
+            self.sample_scores_std = np.std(self.sample_scores)
+            self.sample_utilities_avg = np.mean(self.sample_utilities)
+            self.sample_utilities_std = np.std(self.sample_utilities)
         
         if raw_partition_function == 0:
             raise ValueError("Partition value cannot be zero")
@@ -765,6 +768,8 @@ class Sampler(FileManager):
         if not self.sample_parallel:
         
             sample_indices = []
+            sample_scores = []
+            sample_utilities = []
             
             # Create a dictionary with each batch as a separate key, to handle cases when 
             # there are multiple samples from the same batch without loading the data twice
@@ -785,41 +790,43 @@ class Sampler(FileManager):
                 else:
                     # Or alternatively regenerate the relevant part of the outcome space on the fly if the data 
                     # has not been stored
-                    scores = np.exp(self.generate_batch(key))
-                    
-                max_row_idx = scores.shape[0] - 1
-                max_col_idx = scores.shape[1] - 1
-                
+                    scaled_utilities = self.generate_batch(key)
+                    scores = np.exp(scaled_utilities)
+
                 # Return the row and column of the element of the score matrix with the property that
                 # the difference between the partion residual and the cumulative sum of the matrix elements 
                 # up to that element is the smallest positive number.
                 row_indices, col_indices = self.get_sample_coordinates(scores, batch_dictionary[key])
                 # Add index tuples to the samples list
                 for batch_idx, row_idx, col_idx in zip([key]*len(row_indices), row_indices, col_indices):
-#                    if int(row_idx) == 0 and int(col_idx) == 0:
-#                        sample_indices.append((batch_idx - 1, max_row_idx, max_col_idx))
-#                    else:
                     sample_indices.append((batch_idx, int(row_idx), int(col_idx)))
+                    sample_scores.append(scores[row_idx, col_idx])
+                    sample_utilities.append(1/self.scaling_const*np.log(scores[row_idx, col_idx]))
+            self.sample_scores = sample_scores
+            self.sample_utilities = sample_utilities
+            get_stats()
+                
         else:
             # TODO: Make parallel version work with multiple samples from the same batch
             # Task 1: Build hash table (? could simply put the if else statement a few lines down)
             # and convert to list of tuples (batch, [partition_residuals])
-            batches_partitions = zip(batches,scaled_partitions)
+            batches_partitions = zip(batches, scaled_partitions)
             res = self.get_samples_parallel(batches_partitions)
             # Unpack sample indices from a list of the form [((a,b,c),score),((d,e,f),score)]
             sample_indices = [elem for elem in list(zip(*res))[0]]
             # Unpack sample scores and calculate their mean and std
             self.sample_scores = np.array(list(zip(*res))[1])
-            self.sample_scores_avg = np.mean(self.sample_scores)
-            self.sample_scores_std = np.std(self.sample_scores)
+#            self.sample_scores_avg = np.mean(self.sample_scores)
+#            self.sample_scores_std = np.std(self.sample_scores)
             # Calculate the mean and std of the utilities
             self.sample_utilities = 1/self.scaling_const*np.log(self.sample_scores)
-            self.sample_utilities_avg = np.mean(self.sample_utilities)
-            self.sample_utilities_std = np.std(self.sample_utilities)
+#            self.sample_utilities_avg = np.mean(self.sample_utilities)
+#            self.sample_utilities_std = np.std(self.sample_utilities)
 #            print ("DEBUG: self.sample_scores", self.sample_scores)
 #            print ("DEBUG:", self.sample_utilities)
 #            print ("DEBUG:", self.sample_utilities_avg)
 #            print ("DEBUG:", self.sample_utilities_std)
+            get_stats()
             
             print("Parallel sampling procedure complete")
         self.sample_indices = sample_indices
@@ -854,6 +861,7 @@ class Sampler(FileManager):
             
             # Recover the correct combination 
             combination = nth(recovered_slice, comb_idx)
+            self.recovered_combinations.append(combination)
             print ("Recovered combination", combination)
             # Recover the feature matrix
             feature_matrices.append(self.synth_features[combination, :])
@@ -1039,6 +1047,7 @@ class SyntheticDataGenerator(FileManager):
         self.sampling_parameters['max_utility'] = self.outcome_space.max_scaled_utility*1/self.outcome_space.scaling_const
         self.sampling_parameters['coeffs'] = self.private_data.coefs
         self.sampling_parameters['test_set'] = self.private_data.test_data
+        self.sampling_parameters['synthetic_data'] = self.synthetic_datasets
         print ("Max utility", self.sampling_parameters['max_utility'])
         
     def generate_data(self, property_preserved):
@@ -1081,6 +1090,8 @@ class SyntheticDataGenerator(FileManager):
         
         self.save_synthetic_data(self.synthetic_datasets, self.sampler.directory, experiment_name)
         # print ("The sampled datasets are", self.synthetic_datasets)
+        path = self.sampler.basename + "/" + experiment_name + "/DataLog/"
+        self.save(self.sampling_parameters, path, experiment_name)
         
         return self.sampling_parameters
 

@@ -981,7 +981,7 @@ def sample_datasets_new(num_samples, filenames, raw_partition_function, seed):
     print ("Sampled indices returned by the new algorithm with seed " + str(seed) + " are", sample_indices)    
     return sample_indices
 
-def compare_sampled_indices(sample_1, sample_2):
+def compare_sampled_indices(sample_1, sample_2, length = 4):
     ''' Compares if the sampled indices in the two tuple
     arrays are identical. Preprocessed to remove the fourth entry'''
     
@@ -991,8 +991,12 @@ def compare_sampled_indices(sample_1, sample_2):
     def sort_tuple_array(tuple_array):
         return sorted(tuple_array, key = lambda element: (element[0], element[1]))
     
-    sample_1 = sort_tuple_array(remove_entry(sample_1))
-    sample_2 = sort_tuple_array(remove_entry(sample_2))
+    if length == 4:
+        sample_1 = sort_tuple_array(remove_entry(sample_1))
+        sample_2 = sort_tuple_array(remove_entry(sample_2))
+    else:
+        sample_1 = sort_tuple_array(sample_1)
+        sample_2 = sort_tuple_array(sample_2)
     
     assert sample_1 == sample_2
     print ("Sampling indices are the same for the old and new algorithm")
