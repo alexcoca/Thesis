@@ -500,12 +500,12 @@ class OutcomeSpaceGenerator(FileManager):
         self.private_data = private_data
         self.property_preserved = property_preserved
         # This is the inverse global sensitivity times the privacy parameter
+        self.epsilon = privacy_constant
         if self.property_preserved == 'second_moments':
             self.scaling_const = self.epsilon*self.private_data.features.shape[0]/(2*2)
         else:
             raise NotImplementedError
             # TODO: Implement alternatives
-        self.epsilon = privacy_constant
         self.dimensionality =  self.private_data.features.shape[1]   
         self.n_batches = math.ceil(comb(self.synth_features.shape[0],\
                                         self.dimensionality, exact = True)/self.batch_size)
@@ -618,6 +618,7 @@ class Sampler(FileManager):
         self.sample_scores_std = 0.0
         self.sample_utilities_avg = 0.0
         self.sample_utilities_std = 0.0
+        self.sample_max_utility = 0.0
         self.recovered_combinations = []
         
         # If the Sampler() is instanstiated just to draw more samples for a 
@@ -748,6 +749,7 @@ class Sampler(FileManager):
             self.sample_scores_std = np.std(self.sample_scores)
             self.sample_utilities_avg = np.mean(self.sample_utilities)
             self.sample_utilities_std = np.std(self.sample_utilities)
+            self.sample_max_utility = np.max(self.sample_utilities)
         
         if raw_partition_function == 0:
             raise ValueError("Partition value cannot be zero")
@@ -862,7 +864,7 @@ class Sampler(FileManager):
             # Recover the correct combination 
             combination = nth(recovered_slice, comb_idx)
             self.recovered_combinations.append(combination)
-            print ("Recovered combination", combination)
+            # print ("Recovered combination", combination)
             # Recover the feature matrix
             feature_matrices.append(self.synth_features[combination, :])
 
@@ -899,7 +901,7 @@ class Sampler(FileManager):
             self.experiment_name = experiment_name
             self.cumulative_partition = cumulative_partition
             self.save_data = save_data
-        print ("DEBUG: partition function", self.partition_function)
+        # print ("DEBUG: partition function", self.partition_function)
         self.sample_datasets(self.num_samples, self.filenames, self.partition_function, cumulative_partition)
         self.recover_synthetic_datasets(self.sample_indices)
         self.pack_arguments()
@@ -1045,10 +1047,12 @@ class SyntheticDataGenerator(FileManager):
         self.sampling_parameters['sample_utilities_std'] = self.sampler.sample_utilities_std
         self.sampling_parameters['max_scaled_utility'] = self.outcome_space.max_scaled_utility
         self.sampling_parameters['max_utility'] = self.outcome_space.max_scaled_utility*1/self.outcome_space.scaling_const
+        self.sampling_parameters['max_sampled_utility'] = self.sampler.sample_max_utility
         self.sampling_parameters['coeffs'] = self.private_data.coefs
         self.sampling_parameters['test_set'] = self.private_data.test_data
         self.sampling_parameters['synthetic_data'] = self.synthetic_datasets
-        print ("Max utility", self.sampling_parameters['max_utility'])
+        self.sampling_parameters['private_data'] = self.outcome_space.private_data
+        print ("Overall max utility", self.sampling_parameters['max_utility'])
         
     def generate_data(self, property_preserved):
         

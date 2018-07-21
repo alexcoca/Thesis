@@ -79,9 +79,9 @@ if __name__ == '__main__':
     num_samples = 100
     sample_parallel = False
     load_data = False
-    num_points_targets = 20
-    num_points_features = 20
-    epsilon = 0.1
+    num_points_targets = 5
+    num_points_features = 5
+    epsilon = 10
     seed = 23
     data = second_order_moment_experiment(dimensionality = dimensionality, num_records = num_records, batch_size = batch_size, \
                                             directory = directory, parallel = parallel, save_data = save_data, partition_method = partition_method, \
