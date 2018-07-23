@@ -619,6 +619,7 @@ class Sampler(FileManager):
         self.sample_utilities_avg = 0.0
         self.sample_utilities_std = 0.0
         self.sample_max_utility = 0.0
+        self.sample_min_utility = 0.0
         self.recovered_combinations = []
         
         # If the Sampler() is instanstiated just to draw more samples for a 
@@ -750,6 +751,7 @@ class Sampler(FileManager):
             self.sample_utilities_avg = np.mean(self.sample_utilities)
             self.sample_utilities_std = np.std(self.sample_utilities)
             self.sample_max_utility = np.max(self.sample_utilities)
+            self.sample_min_utility = np.min(self.sample_utilities)
         
         if raw_partition_function == 0:
             raise ValueError("Partition value cannot be zero")
@@ -1022,9 +1024,15 @@ class SyntheticDataGenerator(FileManager):
         # Calculate the minimum between the Frobenius norm of the empirical 
         # covariance matrix difference and the 2-norm of the feature-targets 
         # correlations difference along with its mean and std
-        min_delta_norm = np.minimum(delta_cov_norms_f[:,np.newaxis], delta_corr_norms_2)
-        min_delta_norm_avg = np.mean(min_delta_norm)
-        min_delta_norm_std = np.std(min_delta_norm)
+        max_delta_norm = np.maximum(delta_cov_norms_f[:,np.newaxis], delta_corr_norms_2)
+        max_delta_norm_avg = np.mean(max_delta_norm)
+        max_delta_norm_std = np.std(max_delta_norm)
+        
+        # Calculate the difference between the optimal utility and the maximum sampled utility
+        max_utility = self.outcome_space.max_scaled_utility*1/self.outcome_space.scaling_const
+        delta_opt_avg = max_utility - self.sampler.sample_utilities_avg
+        delta_opt_best = max_utility - self.sampler.sample_max_utility        
+        delta_opt_worst = max_utility - self.sampler.sample_min_utility
         
         # Save the data
         self.sampling_parameters['delta_cov_norms_f'] = delta_cov_norms_f
@@ -1036,9 +1044,9 @@ class SyntheticDataGenerator(FileManager):
         self.sampling_parameters['std_f_norm_cov'] = std_f_norm_cov
         self.sampling_parameters['std_2_norm_cov'] = std_2_norm_cov
         self.sampling_parameters['std_2_norm_corr'] = std_2_norm_corr
-        self.sampling_parameters['min_delta_norm'] = min_delta_norm
-        self.sampling_parameters['min_delta_norm_avg'] = min_delta_norm_avg
-        self.sampling_parameters['min_delta_norm_std'] = min_delta_norm_std
+        self.sampling_parameters['max_delta_norm'] = max_delta_norm
+        self.sampling_parameters['max_delta_norm_avg'] = max_delta_norm_avg
+        self.sampling_parameters['max_delta_norm_std'] = max_delta_norm_std
         self.sampling_parameters['sample_scores'] = self.sampler.sample_scores
         self.sampling_parameters['sample_scores_avg'] = self.sampler.sample_scores_avg
         self.sampling_parameters['sample_scores_std'] = self.sampler.sample_scores_std
@@ -1046,12 +1054,16 @@ class SyntheticDataGenerator(FileManager):
         self.sampling_parameters['sample_utilities_avg'] = self.sampler.sample_utilities_avg
         self.sampling_parameters['sample_utilities_std'] = self.sampler.sample_utilities_std
         self.sampling_parameters['max_scaled_utility'] = self.outcome_space.max_scaled_utility
-        self.sampling_parameters['max_utility'] = self.outcome_space.max_scaled_utility*1/self.outcome_space.scaling_const
+        self.sampling_parameters['max_utility'] = max_utility
         self.sampling_parameters['max_sampled_utility'] = self.sampler.sample_max_utility
+        self.sampling_parameters['min_sampled_utility'] = self.sampler.sample_min_utility
         self.sampling_parameters['coeffs'] = self.private_data.coefs
         self.sampling_parameters['test_set'] = self.private_data.test_data
         self.sampling_parameters['synthetic_data'] = self.synthetic_datasets
         self.sampling_parameters['private_data'] = self.outcome_space.private_data
+        self.sampling_parameters['delta_opt_avg'] = delta_opt_avg
+        self.sampling_parameters['delta_opt_best'] = delta_opt_best
+        self.sampling_parameters['delta_opt_worst'] = delta_opt_worst
         print ("Overall max utility", self.sampling_parameters['max_utility'])
         
     def generate_data(self, property_preserved):
@@ -1109,3 +1121,15 @@ def est_outcome_space_size(N, d, k, covariance_only = False):
     else:
         return comb(N,d, exact = True)
 
+def outcome_space_ratio_calculator(outcome_space_sizes, dim_1, dim_2, num_points_1, num_points_2, num_points_min):
+    '''This function estimates the ratio of the sizes of two given outcome spaces:
+    @ outcome_space_sizes: a dictionary with keys representing the synthethic vectors dimensionality.
+    Each value is a list containing calculated outcome spaces sizes, for target and feature lattices obtained
+    by discretisation with @num_points_min or more
+    @  dim_1, dim_2: The dimensionalities of the outcome spaces to be compared
+    @ num_points_1, num_points_2: The number of points used for the discretisation of the lattices that generate
+    the outcome spaces'''
+    num = outcome_space_sizes[dim_1][num_points_1 - num_points_min]
+    denum = outcome_space_sizes[dim_2][num_points_2 - num_points_min]
+    ratio = num/denum
+    return ratio

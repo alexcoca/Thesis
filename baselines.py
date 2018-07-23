@@ -55,13 +55,14 @@ class DPRegression():
         Sigma = np.transpose(X)@X
         
         # Smallest eigenvalues of empirical cov. matrix
-        lambda_min = np.min(np.linalg.eig(Sigma)[0]) 
+       # lambda_min = np.min(np.linalg.eig(Sigma)[0]) 
+        lambda_min = np.linalg.norm(Sigma, ord = -2)
         
         # Privately release smallest eigenvalue
-        lambda_private = np.max([lambda_min + priv_const*np.random.normal() - priv_const*np.sqrt(6/self.delta),0])
+        lambda_private = np.max([lambda_min + priv_const*np.random.normal() - priv_const*np.sqrt(6/self.delta), 0])
         
         # Calculate regularisation parameter
-        reg_param = np.max([priv_const*np.sqrt(d*np.log(2*d**2/self.rho)) - lambda_private,0])
+        reg_param = np.max([priv_const*np.sqrt(d*np.log(2*d**2/self.rho)) - lambda_private, 0])
         
         # Privately release covariance matrix 
         Z = utils.generate_sym_rand_matrix(d)
