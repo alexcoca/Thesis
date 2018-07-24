@@ -754,13 +754,13 @@ class Sampler(FileManager):
             self.sample_min_utility = np.min(self.sample_utilities)
         
         if raw_partition_function == 0:
-            raise ValueError("Partition value cannot be zero")
+            raise ValueError("Partition value cannot be zero!")
         
         # Sort filenames to ensure correct access of stored data
         filenames  = sorted(filenames, key = get_batch_id)
         
         # Scale partition function
-        scaled_partitions = raw_partition_function * np.random.random(size=(num_samples,))
+        scaled_partitions = raw_partition_function * np.random.random(size = (num_samples,))
         
         # Obtain cumulative partition function - needs to be a numpy array in the actual implementation
         batches = np.searchsorted(cumulative_partition, scaled_partitions)

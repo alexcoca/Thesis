@@ -23,6 +23,8 @@ def extract_data(results):
     delta_opt_avg = []
     delta_opt_best = []
     delta_opt_worst = []
+    # test_set = []
+    # private_data = []
     for result in results:
         avg_2_norms.append(result['avg_2_norm_corr'])
         double_std_2_norms.append(2*result['std_2_norm_corr'])
@@ -40,6 +42,8 @@ def extract_data(results):
         delta_opt_avg.append(result['delta_opt_avg'])
         delta_opt_best.append(result['delta_opt_best'])
         delta_opt_worst.append(result['delta_opt_worst'])
+       # test_set.append(result['test_set'])
+       # private_data.append(result['private_data'])
     test_set = results[0]['test_set']
     private_data = results[0]['private_data']    
     return avg_2_norms, double_std_2_norms, avg_f_norms, double_std_f_norms, max_utilities, sample_utilities, max_sampled_utilities, min_sampled_utilities, \

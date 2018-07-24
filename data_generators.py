@@ -325,7 +325,7 @@ class ContinuousGenerator():
         else:
             self.data = np.concatenate((self.features, self.targets), axis = 1)
         
-    def plot_data(self):
+    def plot_data(self, angle_1 = 30, angle_2 = 0, add_hyperplane = False, hyperplane = []):
         ''' Plot generated data if the dimensionality of the data is one'''
         if self.d == 1:
             plt.plot(self.features, self.targets, 'b*')
@@ -335,17 +335,25 @@ class ContinuousGenerator():
             fig = plt.figure()
             ax = fig.add_subplot(111, projection = '3d')
             # Create grid 
-            x_coord = np.linspace(np.min(self.features[:,0]), np.max(self.features[:,0]), num = num_pts, endpoint = True)
-            y_coord = np.linspace(np.min(self.features[:,1]), np.max(self.features[:,1]), num = num_pts, endpoint = True)
-            xx,yy = np.meshgrid(x_coord,y_coord)
+            x_coord = np.linspace(np.min(self.features[:, 0]), np.max(self.features[:, 0]), num = num_pts, endpoint = True)
+            y_coord = np.linspace(np.min(self.features[:, 1]), np.max(self.features[:, 1]), num = num_pts, endpoint = True)
+            xx, yy = np.meshgrid(x_coord,y_coord)
             # Evaluate the function on the grid
             z = self.coefs[0]*xx + self.coefs[1]*yy
-            ax.plot_surface(xx,yy,z,alpha=0.2)
-            ax.scatter(self.features[:,0], self.features[:,1], self.targets[:])
-#            for angle in range(0, 360):
-#                ax.view_init(30, angle)
-#                plt.draw()
-#                plt.pause(.001)    
+            ax.plot_surface(xx, yy, z, alpha = 0.2)
+            if add_hyperplane:
+                x_coord_add = np.linspace(np.min(self.test_features[:, 0]), np.max(self.test_features[:, 0]), num = num_pts, endpoint = True)
+                y_coord_add = np.linspace(np.min(self.test_features[:, 1]), np.max(self.test_features[:, 1]), num = num_pts, endpoint = True)
+                xx_add, yy_add = np.meshgrid(x_coord_add, y_coord_add)
+                z = hyperplane[0]*xx + hyperplane[1]*yy
+                ax.plot_surface(xx_add, yy_add, alpha = 0.5)
+            ax.scatter(self.features[:, 0], self.features[:, 1], self.targets[:], 'b*')
+            ax.scatter(self.test_features[:, 0], self.test_features[:, 1], self.test_targets[:], 'r*')
+            ax.view_init (angle_1, angle_2)
+            for angle in range(0, 360):
+                ax.view_init(30, angle)
+                plt.draw()
+                plt.pause(.001)    
         else:
             # TODO: Error handling 
             pass
