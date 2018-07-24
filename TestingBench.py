@@ -90,8 +90,8 @@ Created on Thu May 24 20:24:09 2018
 #import numpy as np
 #import math
 #
-#dim = 1
-#num_points = 10
+#dim = 4
+#num_points = 12
 #upper_bound = 1.0
 #lower_bound = -1.0
 #num_dec = 4
@@ -101,7 +101,7 @@ Created on Thu May 24 20:24:09 2018
 #OutputLattice.generate_l2_lattice(dim=dim,radius=radius,lower_bound=lower_bound,upper_bound=upper_bound,num_points=num_points,pos_ord=True,rel_tol=r_tol)
 #intersection_m2 = testutilities.bruteNonIntegerIntersection(dim=dim,radius=radius,num_points=num_points,lower_bound=lower_bound,upper_bound=upper_bound,filtered = False,r_tol=r_tol)
 #test_points = OutputLattice.points
-## Points that are returned by the fancy algorithm but not by brute
+# Points that are returned by the fancy algorithm but not by brute
 #differences_1 = testutilities.get_differences(test_points,intersection_m2)
 #assert differences_1.size == 0
 ## Points that are returned by the brute but not the fancy algorithm
@@ -430,6 +430,7 @@ from data_generators import ContinuousGenerator
 import time
 import pickle,os, glob
 import testutilities
+import collections
 from baselines import Regression, DPRegression
 
 def get_private_F_tilde (private_data):
@@ -1001,16 +1002,14 @@ def compare_sampled_indices(sample_1, sample_2, length = 4):
     assert sample_1 == sample_2
     print ("Sampling indices are the same for the old and new algorithm")
     
-
-
 # Storage
 utility_arrays = [] # Utility arrays
 
 # Declare experiment parameters
 dim = 2
-num_points_feat = 8
-num_points_targ = 8
-batch_size = 10
+num_points_feat = 3
+num_points_targ = 3
+batch_size = 1000
 n_private = 40
 
 # Declare privacy paramters
@@ -1037,14 +1036,14 @@ igs = private_data.features.shape[0]/2
 scaling_const = igs*scaled_epsilon
 
 # Calculate number of batches
-n_batches = math.ceil(comb(features.shape[0],dim,exact = True)/batch_size)
+n_batches = math.ceil(comb(features.shape[0], dim, exact = True)/batch_size)
 print ("Number of batches is", n_batches)
 # Define directory where the files will be saved
 experiment_name = 'test_struct_integrity'
 directory = 'C:/Users/alexc/OneDrive/Documents/GitHub/Thesis/Experiments/' + experiment_name + '/OutcomeSpace'
 
 # Define file name for scores (s) storage
-base_filename_s = "s_eps" + str(epsilon).replace(".","") + "d" + str(dim)
+base_filename_s = "s_eps" + str(epsilon).replace(".", "") + "d" + str(dim)
 
 t_start = time.time()
 results = []
@@ -1075,20 +1074,20 @@ assert np.all(is_diff)
 
 # Test reloading of only some batches - seems to work fine!
 
-batches = [0,1,2]
-
-reloaded_data_batches = testutilities.retrieve_scores(filenames,batches)
-
-is_diff = []
-rtol = 1e-05
-
-sliced_results = [results[x] for x in batches]
-
-for reloaded_element, returned_element in zip(reloaded_data_batches,sliced_results):
-    difference = reloaded_element['scores'] - returned_element[1]
-    is_diff.append(np.all(np.isclose(difference,np.zeros(shape=difference.shape),rtol=rtol)))
-
-assert np.all(is_diff)
+#batches = [0,1,2]
+#
+#reloaded_data_batches = testutilities.retrieve_scores(filenames,batches)
+#
+#is_diff = []
+#rtol = 1e-05
+#
+#sliced_results = [results[x] for x in batches]
+#
+#for reloaded_element, returned_element in zip(reloaded_data_batches,sliced_results):
+#    difference = reloaded_element['scores'] - returned_element[1]
+#    is_diff.append(np.all(np.isclose(difference,np.zeros(shape=difference.shape),rtol=rtol)))
+#
+#assert np.all(is_diff)
  
 # Calculating the partition function...
 
@@ -1212,6 +1211,11 @@ print("Samples scaled utilities", calculated_scaled_utilities)
 print("Samples scores", calculated_scores)
 print("Samples utilities (average)", np.mean(samples_utilities))
 print("Samples utilties (standard dev)", np.std(samples_utilities))
+
+samples_utilities_freqs = collections.Counter(samples_utilities)
+calculated_scaled_utilities_freqs = collections.Counter(calculated_scaled_utilities)
+calculated_scores_freqs = collections.Counter(calculated_scores)
+
 # Retrieve the scores from the raw results
 # This assumes the results contain RAW results (aka exp not taken)
 look_up_scores = testutilities.retrieve_scores_from_results(results, sample_indices, max_scaled_utility = 0.0)        
@@ -1266,6 +1270,22 @@ print ("Min predictive error adassp", np.min(predictive_err_adassp))
 print ("Mean predictive error adassp", np.mean(predictive_err_adassp))
 print ("Std of predictive err adassp", np.std(predictive_err_adassp))
 
+
+# Calculate Frobenius norm of the covariance difference  and the 2-norm of the correlations difference
+emp_cov_synth = 1/dim * np.transpose(synthetic_data_sets[:,:,:-1], axes = (0,2,1))@synthetic_data_sets[:,:,:-1]
+emp_corr = 1/dim * np.transpose(synthetic_data_sets[:,:,:-1], axes = (0,2,1))@synthetic_data_sets[:,:,-1:]
+
+delta_cov = F_tilde_x[:,:-1] - emp_cov_synth
+delta_corr = F_tilde_x[:,-1:] - emp_corr
+
+delta_cov_norms_f = np.linalg.norm(delta_cov, ord = 'fro', axis = (1,2))
+delta_cov_norms_2 = np.linalg.norm(delta_cov, ord = 2, axis = (1,2))
+delta_corr_norms_2 = np.linalg.norm(delta_corr, ord = 2, axis = 1)
+
+avg_f_norm_cov = np.mean(delta_cov_norms_f)
+std_f_norm_cov = np.std(delta_cov_norms_f)
+avg_2_norm_corr = np.mean(delta_corr_norms_2)
+std_2_norm_corr = np.std(delta_corr_norms_2)
 # param_alternative = regressor_alternative.fit_data(synthetic_data_sets_alternative)
 # param_alternative_2 = regressor_alternative2.fit_data(synthetic_data_sets_alternative_2)
 
@@ -1315,19 +1335,120 @@ print ("Std of predictive err adassp", np.std(predictive_err_adassp))
 #dataset = generator.data
 
 #%% Testing Regression class ()
-from baselines import Regression
-import pickle
+#from baselines import Regression
+#import pickle
+#
+#path_1  = 'D:/Thesis/Experiments/s_eps01d2nt6nf6/SyntheticData/s_eps01d2nt6nf6'
+#path_2  = 'D:/Thesis/Experiments/s_eps01d2nt20nf20/SyntheticData/s_eps01d2nt20nf20'
+#with open(path_1, mode = 'rb') as container:
+#    data_1 = pickle.load(container)
+#
+#with open(path_2, mode = 'rb') as container:
+#    data_2 = pickle.load(container)
+#
+#regressor_1 = Regression()
+##parameters_1 = regressor_1.fit_data(data_1)
+#regressor_2 = Regression()
+#parameters_2 = regressor_2.fit_data(data_2)
+#%% Testing experimental setup
+#import second_moment_experiments_main as experiment
+#from exputils import extract_data, initialise_netmech_containers 
+#from baselines import Regression, DPRegression
+#import numpy as np
+#
+## Default parameters list
+#dimensionality = 2
+#num_records = 40
+#test_frac = 0.5
+#batch_size = 100
+#directory = 'D:/Thesis/Experiments/exp_2/'
+#parallel = False
+#save_data = False
+#partition_method = 'fast_2'
+#workers = -1
+#num_samples = 25
+#sample_parallel = False 
+#load_data = False
+#seed = 23
+#
+#num_points_max = 20
+#num_points_min = 4
+#num_points_features_vec = range(num_points_min, num_points_max + 1)
+#num_points_targets_vec = range(num_points_min, num_points_max + 1)
+#
+#epsilon_vec = [0.1, 1.0]
+#results = {key: [] for key in epsilon_vec}
+#
+## Collect results
+#for epsilon in epsilon_vec:
+#    for num_points_features, num_points_targets in zip(num_points_features_vec, num_points_targets_vec):
+#        results[epsilon].append(experiment.second_order_moment_experiment(dimensionality = dimensionality, num_records = num_records, test_frac = test_frac, batch_size = batch_size,directory = directory, parallel = parallel, save_data = save_data,\
+#                                                                 partition_method = partition_method, workers = workers, num_samples = num_samples,\
+#                                                                 sample_parallel = sample_parallel, load_data = load_data, num_points_targets = num_points_targets,\
+#                                                                 num_points_features = num_points_features, epsilon = epsilon, seed = seed))
+#
+## Experimental data containers
+#avg_2_norms, double_std_2_norms, avg_f_norms, double_std_f_norms, max_utilities, max_sampled_utilities, avg_samples_utility,\
+#double_std_utility, avg_samples_score, double_std_score, synthetic_datasets_vec, test_set, private_data = initialise_netmech_containers(epsilon_vec)
+#
+#for key in results:
+#    avg_2_norms[key], double_std_2_norms[key], avg_f_norms[key], double_std_f_norms[key], max_utilities[key], max_sampled_utilities[key],\
+#    avg_samples_utility[key], double_std_utility[key], avg_samples_score[key], double_std_score[key], synthetic_datasets_vec[key],\
+#    test_set[key], private_data[key] = extract_data(results[key]) 
+#
+#adassp_reg_coef = {key: [] for key in epsilon_vec}
+#predictive_err_adassp = {key: [] for key in epsilon_vec}
+#min_predictive_err_adassp = {key: [] for key in epsilon_vec}
+#mean_predictive_err_adassp = {key: [] for key in epsilon_vec}
+#double_std_predictive_err_adassp = {key: [] for key in epsilon_vec}
+#
+## Fit ADASSP to the private dataset
+#for epsilon in epsilon_vec:
+#    adassp_regressor = DPRegression()
+#    adassp_reg_coef[epsilon] = adassp_regressor.get_parameters(private_data[epsilon].features, private_data[epsilon].targets,\
+#                                                           num_samples, epsilon)
+#    predictive_err_adassp[epsilon] = Regression().calculate_predictive_error(private_data[epsilon].test_data, adassp_reg_coef[epsilon])
+#    min_predictive_err_adassp[epsilon] = np.min(predictive_err_adassp[epsilon])
+#    mean_predictive_err_adassp[epsilon] = np.mean(predictive_err_adassp[epsilon])
+#    double_std_predictive_err_adassp[epsilon] = 2*np.std(predictive_err_adassp[epsilon])
+#    print ("Min predictive error adassp for eps " + str(epsilon) , min_predictive_err_adassp[epsilon])
+#    print ("Mean predictive error adassp " + str(epsilon), mean_predictive_err_adassp[epsilon])
+#    print ("Twice the std of predictive err adassp " + str(epsilon), double_std_predictive_err_adassp[epsilon])
+#    
+#net_mech_reg_coefs = {key: [] for key in epsilon_vec}
+#predictive_errs_netmech = {key: [] for key in epsilon_vec}
+#min_predictive_errs_netmech = {key: [] for key in epsilon_vec}
+#mean_predictive_errs_netmech = {key: [] for key in epsilon_vec}
+#double_std_predictive_errs_netmech = {key: [] for key in epsilon_vec}
+#
+#for epsilon in epsilon_vec: 
+#    for synthetic_datasets in synthetic_datasets_vec[epsilon]:
+#        netmech_regressor = Regression()
+#        net_mech_reg_coef = netmech_regressor.fit_data(synthetic_datasets)
+#        net_mech_reg_coefs[epsilon].append(net_mech_reg_coef)
+#        predictive_err_netmech = netmech_regressor.calculate_predictive_error(private_data[epsilon].test_data, net_mech_reg_coef)
+#        predictive_errs_netmech[epsilon].append(predictive_err_netmech)
+#        min_predictive_errs_netmech[epsilon].append(np.min(predictive_err_netmech))
+#        mean_predictive_errs_netmech[epsilon].append(np.mean(predictive_err_netmech))
+#        double_std_predictive_errs_netmech[epsilon].append(2*np.std(predictive_err_netmech))
+#    print("Overall minimum predictive error for netmechanism " + str(epsilon) + " is {}, obtained for n_t = {}."\
+#          .format(str(np.min(np.array(min_predictive_errs_netmech[epsilon]))),\
+#                  str(list(num_points_features_vec)[np.argmin(np.array(min_predictive_errs_netmech[epsilon]))])))
+#    print("Minimum average predictive error for netmechanism " + str(epsilon) + " is {}, obtained for n_t = {}."\
+#          .format(str(np.min(np.array(mean_predictive_errs_netmech[epsilon]))),\
+#                  str(list(num_points_features_vec)[np.argmin(np.array(mean_predictive_errs_netmech[epsilon]))])))
+#%% 
+# Plot the dataset 
+from data_generators import ContinuousGenerator
+import numpy as np
+dimensionality = 2
+num_records = 40
+test_frac = 0.5
+private_data = ContinuousGenerator(d = dimensionality, n = num_records)
+private_data.generate_data(test_frac = test_frac)   
+# private_data.plot_data()
 
-path_1  = 'D:/Thesis/Experiments/s_eps01d2nt6nf6/SyntheticData/s_eps01d2nt6nf6'
-path_2  = 'D:/Thesis/Experiments/s_eps01d2nt20nf20/SyntheticData/s_eps01d2nt20nf20'
-with open(path_1, mode = 'rb') as container:
-    data_1 = pickle.load(container)
-
-with open(path_2, mode = 'rb') as container:
-    data_2 = pickle.load(container)
-
-regressor_1 = Regression()
-#parameters_1 = regressor_1.fit_data(data_1)
-regressor_2 = Regression()
-parameters_2 = regressor_2.fit_data(data_2)
+test_features = private_data.test_features
+test_features_norms = np.linalg.norm(test_features, ord = 2, axis = 1)
+train_data = private_data.data
 
