@@ -85,7 +85,9 @@ def initialise_netmech_reg_containers(epsilon_vec):
     min_predictive_errs_netmech = {key: [] for key in epsilon_vec}
     mean_predictive_errs_netmech = {key: [] for key in epsilon_vec}
     double_std_predictive_errs_netmech = {key: [] for key in epsilon_vec}
-    return net_mech_reg_coefs, predictive_errs_netmech, min_predictive_errs_netmech, mean_predictive_errs_netmech, double_std_predictive_errs_netmech
+    singular_indices = {key: [] for key in epsilon_vec}
+    return net_mech_reg_coefs, predictive_errs_netmech, min_predictive_errs_netmech,\
+             mean_predictive_errs_netmech, double_std_predictive_errs_netmech, singular_indices
 
 def initialise_adassp_reg_containers(epsilon_vec):
     adassp_reg_coef = {key: [] for key in epsilon_vec}
