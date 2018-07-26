@@ -85,22 +85,22 @@ Created on Thu May 24 20:24:09 2018
 
 #%% Test FeaturesLattice Class
 
-#from netmechanism import FeaturesLattice
-#import testutilities
-#import numpy as np
-#import math
-#
-#dim = 4
-#num_points = 12
-#upper_bound = 1.0
-#lower_bound = -1.0
-#num_dec = 4
-#radius = 1.0
-#r_tol = 1e-5
-#OutputLattice = FeaturesLattice()
-#OutputLattice.generate_l2_lattice(dim=dim,radius=radius,lower_bound=lower_bound,upper_bound=upper_bound,num_points=num_points,pos_ord=True,rel_tol=r_tol)
+from netmechanism import FeaturesLattice
+import testutilities
+import numpy as np
+import math
+
+dim = 2
+num_points = 50
+upper_bound = 1.0
+lower_bound = -1.0
+num_dec = 4
+radius = 1.0
+r_tol = 1e-5
+OutputLattice = FeaturesLattice()
+OutputLattice.generate_l2_lattice(dim=dim,radius=radius,lower_bound=lower_bound,upper_bound=upper_bound,num_points=num_points,pos_ord=True,rel_tol=r_tol)
 #intersection_m2 = testutilities.bruteNonIntegerIntersection(dim=dim,radius=radius,num_points=num_points,lower_bound=lower_bound,upper_bound=upper_bound,filtered = False,r_tol=r_tol)
-#test_points = OutputLattice.points
+test_points = OutputLattice.points
 # Points that are returned by the fancy algorithm but not by brute
 #differences_1 = testutilities.get_differences(test_points,intersection_m2)
 #assert differences_1.size == 0
@@ -432,55 +432,18 @@ import pickle,os, glob
 import testutilities
 import collections
 from baselines import Regression, DPRegression
-
-def get_private_F_tilde (private_data):
+          
+def get_synthetic_F_tilde (synthetic_data):
     
     # Compute F_tilde (equation (4.1), Chapter 4, Section 4.1.1)
     # for the private data
     
-    const = (1/private_data.features.shape[0])
-    F_x = const*private_data.features.T@private_data.features
-    f_x = const*private_data.features.T@private_data.targets
+    const = (1/dim)
+    F_x = const*synthetic_data[:,:-1].T@synthetic_data[:,:-1]
+    f_x = const*synthetic_data[:,:-1].T@synthetic_data[:,-1:]
     F_tilde_x = np.concatenate((F_x,f_x), axis = 1)
     
-    return F_tilde_x        
-    
-# @profile
-
-def save_batch_scores(batch, filename, directory = '', overwrite = False):
-    ''' Saves the batch of scores to the location specified by @directory with
-    the name specified by @filename.'''
-    
-    # If directory is not specified, then the full path is provided in filename
-    # This is used to overwrite the files containing the raw scores during the 
-    # calculation of the partition function to avoid unnecessary duplication of 
-    # operations during the sampling step
-    
-    if not directory:
-        full_path = filename
-        
-        if overwrite:
-            with open(full_path,"wb") as data:
-                pickle.dump(batch,data)
-        else:
-            # Overwriting data only alowed if this is explicitly mentioned
-            if os.path.exists(full_path):
-                assert False
-            
-    else:
-        
-        # Create directories if they don't exist
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-            
-        full_path = directory+"/"+filename
-       
-        # Raise an error if the target file exists
-#        if os.path.exists(full_path):
-#                assert False
-           
-        with open(full_path,"wb") as data:
-            pickle.dump(batch,data)
+    return F_tilde_x  
 
 #@profile
 def calculate_partition_function(filenames,n_batches,test = False, max_score = 0.0):
@@ -506,7 +469,7 @@ def calculate_partition_function(filenames,n_batches,test = False, max_score = 0
         if test:
             # Keep a copy of the original data to allow testing 
             fname = "orig_" + filenames[batch][filenames[batch].rfind("\\") + 1:]
-            save_batch_scores(data,fname,directory.replace("*",""))
+            testutilities.save_batch_scores(data,fname,directory.replace("*",""))
             
         # Apply sum-exp trick when calc. partition to avod numerical issues
         data['scores'] = np.exp(data['scores'] - max_score)
@@ -514,66 +477,11 @@ def calculate_partition_function(filenames,n_batches,test = False, max_score = 0
         
         # Overwrite the raw batch scores with the scores calculated as per 
         # Step 3 of the procedudre in Chapter 4, Section 4.1.3 
-        save_batch_scores(data, filenames[batch], overwrite = True)
+        testutilities.save_batch_scores(data, filenames[batch], overwrite = True)
     
     return partition_function
 
-#@profile
-def compute_second_moment_utility(outcomes):
-                         
-    f_r_tensor = (1/dim)*np.matmul(targets, outcomes)
-    
-    # Calculate F_r = 1/d Xh'Xh (' denotes transpose). This is applied for all Xh in the synth_features_tensor
-    F_r_tensor = (1/dim)*np.transpose(outcomes,axes = (0,2,1))@outcomes
-    
-    #TODO: add comment
-    f_r_expand = f_r_tensor.reshape(tuple([*f_r_tensor.shape,1]))
-    
-    #TODO: add comment
-    F_r_expand = np.repeat(F_r_tensor, repeats = targets.shape[0], axis = 0).reshape(F_r_tensor.shape[0], -1, *F_r_tensor[0].shape)
-    
-    #TODO: add comment
-    F_tilde_r = np.concatenate((F_r_expand, f_r_expand), axis = 3)
-    
-    # Utilities for the particular batch are returned as a matrix of dimension batch_size x p where p is the number of 
-    # synthetic targets. Exp-normalise trick is implemented so the exponentiation is done in the sampling step
-    utility = - scaling_const*np.max(np.abs(F_tilde_x - F_tilde_r), axis = (3,2))
-    
-    return utility
-
 # @profile
-def evaluate_sample_score(batch_index, test = False):
-    
-    # Storage structure
-    struct = {}
-    
-    # Store the batch index to be able to retrieve the correct sample during sampling step
-    struct['batch_index']  = batch_index
-    
-    # Generate a batch of combinations according to the batch_index
-    batch = list(itertools.islice(itertools.combinations(range(features.shape[0]),dim),(batch_index)*batch_size,(batch_index+1)*batch_size))
-    
-    # Evaluate utility - note that exponential is not taken as sum-exp trick is implemented to 
-    # evalute the scores in a numerically stable way during sampling stage
-    score_batch = compute_second_moment_utility(features[batch,:])
-    struct ['scores'] = score_batch
-    struct ['test_data'] = batch
-    
-    # Create data structure which stores the scores for each batch along with 
-    # the combinations that generated them
-    max_util = np.max(score_batch)
-    
-    # save the slice object
-    filename = "/" + base_filename_s + "_" + str(batch_index)
-    save_batch_scores(struct,filename,directory)
-    
-    partial_sum = np.sum(np.exp(score_batch))
-    # Only max_util is returned in the final version of the code to 
-    # allow implementation of exp-normalise trick during sampling . 
-    # score_batch is returned for testing purposes
-    
-    return (max_util,score_batch, partial_sum)
-    
 def calculate_partition_function_alt(iterable):
     
     def func(scores_batch,max_score):
@@ -728,48 +636,6 @@ def sample_dataset(n_batches, num_samples, partition_function, filenames, seed):
         sample_indices.append(get_sample(scaled_partition))
     print("Sampled indices, old algorithm with seed " + str(seed) + " are",sample_indices)
     return sample_indices
-
-def recover_synthetic_datasets(sample_indices):
-    
-    def nth(iterable, n, default=None):
-        "Returns the nth item from iterable or a default value"
-        return next(itertools.islice(iterable, n, None), default)
-    
-    # Data containers
-    feature_matrices = []
-    synthetic_data_sets = []
-    
-    # Batches the samples were drawn from
-    batches = [element[0] for element in sample_indices]   
-    
-    # Combinations corresponding to the element which resulted in the zero crossing
-    # These are used to recover the feature matrices
-    combs_idxs = [element[1] for element in sample_indices]
-    
-    # List of indices of the target vectors for the sampled data sets
-    target_indices = [element[2] for element in sample_indices]
-    
-    # Feature matrix reconstruction 
-    for batch_idx, comb_idx in zip(batches, combs_idxs):
-        
-        # Reconstruct slice
-        recovered_slice = itertools.islice(itertools.combinations(range(features.shape[0]), dim), (batch_idx)*batch_size, (batch_idx+1)*batch_size)
-        
-        # Recover the correct combination 
-        combination = nth(recovered_slice, comb_idx)
-        print ("Recovered combination", combination)
-    
-        # Recover the feature matrix
-        feature_matrices.append(features[combination,:])
-
-    # Reconstruct the targets for the synthethic feature matrix 
-    for feature_matrix,target_index in zip(feature_matrices,target_indices):
-        #try:
-        synthetic_data_sets.append(np.concatenate((feature_matrix, targets[target_index,:].reshape(targets.shape[1],1)), axis = 1))
-        # except IndexError:
-        #    synthetic_data_sets.append(np.concatenate((feature_matrix, targets[target_index - 1,:].reshape(targets.shape[1],1)), axis = 1))
-        
-    return synthetic_data_sets 
 
 def calculate_accuracy(synthetic_datasets, dimensionality, F_tilde_x):
         
@@ -1009,25 +875,25 @@ utility_arrays = [] # Utility arrays
 dim = 2
 num_points_feat = 3
 num_points_targ = 3
-batch_size = 1000
+batch_size = 10
 n_private = 40
 
 # Declare privacy paramters
-epsilon = 0.1
+epsilon = 2.0
 scaled_epsilon = epsilon/2 
 # Declare synthetic space elements
 OutputLattice = FeaturesLattice()
-OutputLattice.generate_l2_lattice(dim = dim,num_points = num_points_feat)
+OutputLattice.generate_l2_lattice(dim = dim, num_points = num_points_feat)
 features = OutputLattice.points
 OutputLattice2 = TargetsLattice()
-OutputLattice2.generate_lattice(dim = dim,num_points = num_points_targ)
+OutputLattice2.generate_lattice(dim = dim, num_points = num_points_targ)
 targets = OutputLattice2.points
 
 # Generate synthethic data and compute its utility
 private_data = ContinuousGenerator(d = dim, n = n_private)
 private_data.generate_data(test_frac = 0.5)
 print ("Coefficients of the model from which the private data was generated are", private_data.coefs)
-F_tilde_x = get_private_F_tilde(private_data)
+F_tilde_x = testutilities.get_private_F_tilde(private_data)
 
 # Inverse global sensitivity
 igs = private_data.features.shape[0]/2 
@@ -1048,11 +914,16 @@ base_filename_s = "s_eps" + str(epsilon).replace(".", "") + "d" + str(dim)
 t_start = time.time()
 results = []
 for batch_index in range(n_batches):
-    results.append(evaluate_sample_score(batch_index))
+    results.append(testutilities.evaluate_sample_score(batch_index, features, targets, scaling_const, F_tilde_x, dim, batch_size, \
+                                                       base_filename_s, directory))
 t_elapsed = time.time()
+
 
 print("Time elapsed for single core processing of this small case is..." + " " + str(t_elapsed - t_start))
 
+
+res = np.exp(results[0][1]).flatten().tolist()
+res_freqs = collections.Counter(res)
 # Test that data reloading function works - seems to work fine
 
 if directory.rfind("*") == -1:
@@ -1121,8 +992,8 @@ for result in results:
     intermediate_partition_values.append(np.sum(np.exp(result[1] - max_scaled_utility)))
     debug_partition_function += np.sum(np.exp(result[1] - max_scaled_utility))
     
-print ("Raw partition value",raw_partition_function)
-print ("Debug partition function value",debug_partition_function)
+print ("Raw partition value", raw_partition_function)
+print ("Debug partition function value", debug_partition_function)
 
 # Calculate partition function (using sum_exp) 
 partition_function = calculate_partition_function(filenames, n_batches, test = False, max_score = 0.0)
@@ -1197,12 +1068,12 @@ assert (all(mask))
 
 # And finally the matrix recovery procedure...   
 
-synthetic_data_sets = np.array(recover_synthetic_datasets(sample_indices))
-synthetic_data_sets_alternative =  np.array(recover_synthetic_datasets(sample_indices_modified))
+synthetic_data_sets = np.array(testutilities.recover_synthetic_datasets(sample_indices, features, targets, batch_size, dim ))
+synthetic_data_sets_alternative =  np.array(testutilities.recover_synthetic_datasets(sample_indices, features, targets, batch_size, dim))
 #print ("The data sets sampled are", synthetic_data_sets)
 
 # Recalculate scores and utilities based on the recovered synthetic data sets
-calculated_scores, calculated_scaled_utilities = testutilities.calculate_recovered_scores(synthetic_data_sets, F_tilde_x, scaling_const, dim)
+calculated_scores, calculated_scaled_utilities, _ = testutilities.calculate_recovered_scores(synthetic_data_sets, F_tilde_x, scaling_const, dim)
 
 samples_utilities =  np.array((1/scaling_const)*calculated_scaled_utilities)
 

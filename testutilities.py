@@ -10,6 +10,7 @@ import itertools
 import math
 import glob
 import pickle
+import os
 
 def bruteNonIntegerIntersection(dim, radius, num_points = 5, lower_bound = -1, upper_bound = 1,filtered = False, r_tol = 1e-06):
     """ Generate a lattice inside the d-dimensional hypersphere. Brute force method,
@@ -231,7 +232,7 @@ def check_sampling (sample_indices_set, results, max_score):
         
     return partition_residuals
 
-def get_synthetic_F_tilde(synthetic_data,dim):
+def get_synthetic_F_tilde(synthetic_data, dim):
     ''' Computes the contribution of an outcome to the 
     utility function'''
     
@@ -260,17 +261,19 @@ def calculate_recovered_scores(synthetic_data_sets, F_tilde_x, scaling_const, di
     F_tilde_rs = []
     
     for synthethic_data_set in synthetic_data_sets:
-        F_tilde_rs.append(get_synthetic_F_tilde(synthethic_data_set,dim))
+        F_tilde_rs.append(get_synthetic_F_tilde(synthethic_data_set, dim))
         
     F_tilde_rs = np.array(F_tilde_rs)
 
     # Calculate utitlites
-    utilities_array = - scaling_const*np.max(np.abs(F_tilde_x - F_tilde_rs), axis = (2,1))
+    utilities_array = - np.max(np.abs(F_tilde_x - F_tilde_rs), axis = (2,1))
+    
+    scaled_utilities_array = - scaling_const*np.max(np.abs(F_tilde_x - F_tilde_rs), axis = (2,1))
     
     # Calculate scores
-    scores_array = np.exp(utilities_array - max_scaled_utility)
+    scores_array = np.exp(scaled_utilities_array - max_scaled_utility)
     
-    return (scores_array, utilities_array)
+    return (scores_array, scaled_utilities_array, utilities_array)
 
 def retrieve_scores_from_results(results, sample_indices, max_scaled_utility = 0.0):
     ''' This test function is used to calculate the scores given 
@@ -333,4 +336,156 @@ def load_data(path):
         data = pickle.load(container)
     return data
 
+def compute_second_moment_utility(outcomes, targets, dim, F_tilde_x, scaling_const):
+                         
+    f_r_tensor = (1/dim)*np.matmul(targets, outcomes)
+    
+    # Calculate F_r = 1/d Xh'Xh (' denotes transpose). This is applied for all Xh in the synth_features_tensor
+    F_r_tensor = (1/dim)*np.transpose(outcomes,axes = (0,2,1))@outcomes
+    
+    #TODO: add comment
+    f_r_expand = f_r_tensor.reshape(tuple([*f_r_tensor.shape,1]))
+    
+    #TODO: add comment
+    F_r_expand = np.repeat(F_r_tensor, repeats = targets.shape[0], axis = 0).reshape(F_r_tensor.shape[0], -1, *F_r_tensor[0].shape)
+    
+    #TODO: add comment
+    F_tilde_r = np.concatenate((F_r_expand, f_r_expand), axis = 3)
+    
+    # Utilities for the particular batch are returned as a matrix of dimension batch_size x p where p is the number of 
+    # synthetic targets. Exp-normalise trick is implemented so the exponentiation is done in the sampling step
+    utility = - scaling_const*np.max(np.abs(F_tilde_x - F_tilde_r), axis = (3,2))
+    
+    return utility
 
+def get_private_F_tilde (private_data):
+    
+    # Compute F_tilde (equation (4.1), Chapter 4, Section 4.1.1)
+    # for the private data
+    
+    const = (1/private_data.features.shape[0])
+    F_x = const*private_data.features.T@private_data.features
+    f_x = const*private_data.features.T@private_data.targets
+    F_tilde_x = np.concatenate((F_x,f_x), axis = 1)
+    
+    return F_tilde_x  
+
+def save_batch_scores(batch, filename, directory = '', overwrite = False):
+    ''' Saves the batch of scores to the location specified by @directory with
+    the name specified by @filename.'''
+    
+    # If directory is not specified, then the full path is provided in filename
+    # This is used to overwrite the files containing the raw scores during the 
+    # calculation of the partition function to avoid unnecessary duplication of 
+    # operations during the sampling step
+    
+    if not directory:
+        full_path = filename
+        
+        if overwrite:
+            with open(full_path,"wb") as data:
+                pickle.dump(batch,data)
+        else:
+            # Overwriting data only alowed if this is explicitly mentioned
+            if os.path.exists(full_path):
+                assert False
+            
+    else:
+        
+        # Create directories if they don't exist
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+            
+        full_path = directory+"/"+filename
+       
+        # Raise an error if the target file exists
+#        if os.path.exists(full_path):
+#                assert False
+           
+        with open(full_path,"wb") as data:
+            pickle.dump(batch,data)
+
+def evaluate_sample_score(batch_index, features, targets, scaling_const, F_tilde_x, dim, batch_size, base_filename_s,\
+                          directory, test = False):
+    
+    # Storage structure
+    struct = {}
+    
+    # Store the batch index to be able to retrieve the correct sample during sampling step
+    struct['batch_index']  = batch_index
+    
+    # Generate a batch of combinations according to the batch_index
+    batch = list(itertools.islice(itertools.combinations(range(features.shape[0]),dim),(batch_index)*batch_size,(batch_index+1)*batch_size))
+    
+    # Evaluate utility - note that exponential is not taken as sum-exp trick is implemented to 
+    # evalute the scores in a numerically stable way during sampling stage
+    score_batch = compute_second_moment_utility(features[batch,:], targets, dim, F_tilde_x, scaling_const)
+    struct ['scores'] = score_batch
+    struct ['test_data'] = batch
+    
+    # Create data structure which stores the scores for each batch along with 
+    # the combinations that generated them
+    max_util = np.max(score_batch)
+    
+    # Find the indices of the maximum in the score batch
+    max_scaled_util_ind = np.argwhere( np.isclose(score_batch - max_util, 0.0, rtol = 1e-9)).tolist()
+    
+    # Insert the index of the batch to have the coordinates of the sample with max utility
+    for elem in max_scaled_util_ind:
+        elem.insert(0, batch_index)
+    max_scaled_util_coord = [tuple(elem) for elem in max_scaled_util_ind]
+    
+    
+    # save the slice object
+    filename = "/" + base_filename_s + "_" + str(batch_index)
+    save_batch_scores(struct,filename,directory)
+    
+    partial_sum = np.sum(np.exp(score_batch))
+    # Only max_util is returned in the final version of the code to 
+    # allow implementation of exp-normalise trick during sampling . 
+    # score_batch is returned for testing purposes
+    
+    return (max_util,score_batch, partial_sum, max_scaled_util_coord)
+
+def recover_synthetic_datasets(sample_indices, features, targets, batch_size, dim):
+    
+    def nth(iterable, n, default=None):
+        "Returns the nth item from iterable or a default value"
+        return next(itertools.islice(iterable, n, None), default)
+    
+    # Data containers
+    feature_matrices = []
+    synthetic_data_sets = []
+    
+    # Batches the samples were drawn from
+    batches = [element[0] for element in sample_indices]   
+    
+    # Combinations corresponding to the element which resulted in the zero crossing
+    # These are used to recover the feature matrices
+    combs_idxs = [element[1] for element in sample_indices]
+    
+    # List of indices of the target vectors for the sampled data sets
+    target_indices = [element[2] for element in sample_indices]
+    
+    # Feature matrix reconstruction 
+    for batch_idx, comb_idx in zip(batches, combs_idxs):
+        
+        # Reconstruct slice
+        recovered_slice = itertools.islice(itertools.combinations(range(features.shape[0]), dim), \
+                                           (batch_idx)*batch_size, (batch_idx + 1)*batch_size)
+        
+        # Recover the correct combination 
+        combination = nth(recovered_slice, comb_idx)
+        # print ("Recovered combination", combination)
+    
+        # Recover the feature matrix
+        feature_matrices.append(features[combination, :])
+
+    # Reconstruct the targets for the synthethic feature matrix 
+    for feature_matrix,target_index in zip(feature_matrices,target_indices):
+        #try:
+        synthetic_data_sets.append(np.concatenate((feature_matrix, targets[target_index,:].reshape(targets.shape[1], 1)), axis = 1))
+        # except IndexError:
+        #    synthetic_data_sets.append(np.concatenate((feature_matrix, targets[target_index - 1,:].reshape(targets.shape[1],1)), axis = 1))
+        
+    return synthetic_data_sets 
