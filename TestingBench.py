@@ -90,17 +90,17 @@ import testutilities
 import numpy as np
 import math
 
-dim = 2
-num_points = 50
+dim = 10
+num_points = 10
 upper_bound = 1.0
 lower_bound = -1.0
 num_dec = 4
 radius = 1.0
 r_tol = 1e-5
-OutputLattice = FeaturesLattice()
-OutputLattice.generate_l2_lattice(dim=dim,radius=radius,lower_bound=lower_bound,upper_bound=upper_bound,num_points=num_points,pos_ord=True,rel_tol=r_tol)
-#intersection_m2 = testutilities.bruteNonIntegerIntersection(dim=dim,radius=radius,num_points=num_points,lower_bound=lower_bound,upper_bound=upper_bound,filtered = False,r_tol=r_tol)
-test_points = OutputLattice.points
+#OutputLattice = FeaturesLattice()
+#OutputLattice.generate_l2_lattice(dim=dim,radius=radius,lower_bound=lower_bound,upper_bound=upper_bound,num_points=num_points,pos_ord=True,rel_tol=r_tol)
+intersection_m2 = testutilities.bruteNonIntegerIntersection(dim=dim,radius=radius,num_points=num_points,lower_bound=lower_bound,upper_bound=upper_bound,filtered = False,r_tol=r_tol)
+#test_points = OutputLattice.points
 # Points that are returned by the fancy algorithm but not by brute
 #differences_1 = testutilities.get_differences(test_points,intersection_m2)
 #assert differences_1.size == 0
@@ -432,6 +432,7 @@ import pickle,os, glob
 import testutilities
 import collections
 from baselines import Regression, DPRegression
+from itertools import chain
           
 def get_synthetic_F_tilde (synthetic_data):
     
@@ -873,13 +874,13 @@ utility_arrays = [] # Utility arrays
 
 # Declare experiment parameters
 dim = 2
-num_points_feat = 3
-num_points_targ = 3
-batch_size = 10
+num_points_feat = 14
+num_points_targ = 14
+batch_size = 100
 n_private = 40
 
 # Declare privacy paramters
-epsilon = 2.0
+epsilon = 0.1
 scaled_epsilon = epsilon/2 
 # Declare synthetic space elements
 OutputLattice = FeaturesLattice()
@@ -921,6 +922,19 @@ t_elapsed = time.time()
 
 print("Time elapsed for single core processing of this small case is..." + " " + str(t_elapsed - t_start))
 
+# Get the data sets that have maximum utility
+
+# First we extract the maximum scaled utilities for each batch in an array
+partial_maxima = np.array([elem[0] for elem in results])
+# Then we return the indices in the array where the maxima occur - the maximum might exist in multiple batches
+maxima_indices = np.argwhere( np.isclose(partial_maxima - np.max(partial_maxima), 0.0, rtol = 1e-9))
+maxima_indices = list(chain.from_iterable(maxima_indices))
+# Now we just merge the tuples of indices where the maximum scaled utilities have been identified in combs_array
+combs_array = []
+for index in maxima_indices:
+    combs_array.extend(results[index][3])
+# And finally we reconstruct the datasets which generate the corresponding scaled utilities
+optimal_synthetic_datasets = np.array(testutilities.recover_synthetic_datasets(combs_array, features, targets, batch_size, dim))
 
 res = np.exp(results[0][1]).flatten().tolist()
 res_freqs = collections.Counter(res)
@@ -1040,7 +1054,7 @@ print ("Alternative method for calculating partition function gives", partition_
 
 # Now let's test the sampling procedure...
 
-num_samples = 25
+num_samples = 250
 seed = 23
 
 sample_indices = sample_dataset(n_batches, num_samples, raw_partition_function, filenames, seed)
@@ -1130,6 +1144,13 @@ predictive_err_netmech = netmech_regressor.calculate_predictive_error(private_da
 print ("Min predictive error net mechanism", np.min(predictive_err_netmech))
 print ("Mean predictive error net mechanism", np.mean(predictive_err_netmech))
 print ("Std of predictive err net mechanism", np.std(predictive_err_netmech))
+
+optimal_netmech_regressor = Regression()
+optimal_param = netmech_regressor.fit_data(optimal_synthetic_datasets)
+optimal_predictive_err_netmech = optimal_netmech_regressor.calculate_predictive_error(private_data.test_data, optimal_param)
+print ("Min predictive error net mechanism (optimal outcomes)", np.min(predictive_err_netmech))
+print ("Mean predictive error net mechanism (optimal outcomes)", np.mean(predictive_err_netmech))
+
 
 # Fit pamaters with ADASSP algorithm
 
