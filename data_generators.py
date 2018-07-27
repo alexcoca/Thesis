@@ -350,10 +350,15 @@ class ContinuousGenerator():
             ax.scatter(self.features[:, 0], self.features[:, 1], self.targets[:], 'b*')
             ax.scatter(self.test_features[:, 0], self.test_features[:, 1], self.test_targets[:], 'r*')
             ax.view_init (angle_1, angle_2)
+            ax.set_xlabel(r'$x_1$', fontsize = 20)
+            ax.set_ylabel(r'$x_2$', fontsize = 20)
+            ax.set_zlabel(r'$y$', fontsize = 20)
             for angle in range(0, 360):
                 ax.view_init(30, angle)
                 plt.draw()
                 plt.pause(.001)    
+
+
         else:
             # TODO: Error handling 
             pass

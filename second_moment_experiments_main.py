@@ -20,7 +20,7 @@ def second_order_moment_experiment(dimensionality = 2, num_records = 20, test_fr
     # Initialise private_data object
     # '__spec__' = None
     private_data = ContinuousGenerator(d = dimensionality, n = num_records)
-    private_data.generate_data(test_frac = test_frac)
+    private_data.generate_data(test_frac = test_frac, seed = seed)
     
     # Initialise OutcomeSpaceGenerator()
     OutcomeSpace = OutcomeSpaceGenerator(directory = directory, batch_size = batch_size, parallel = parallel,\
