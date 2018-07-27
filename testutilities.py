@@ -11,6 +11,7 @@ import math
 import glob
 import pickle
 import os
+from itertools import chain
 
 def bruteNonIntegerIntersection(dim, radius, num_points = 5, lower_bound = -1, upper_bound = 1,filtered = False, r_tol = 1e-06):
     """ Generate a lattice inside the d-dimensional hypersphere. Brute force method,
@@ -20,7 +21,7 @@ def bruteNonIntegerIntersection(dim, radius, num_points = 5, lower_bound = -1, u
     
     def filter_unsorted(array):
         """ Removes rows that are not sorted from a numpy array, @array """
-        def is_sorted(iterable, reverse= True):
+        def is_sorted(iterable, reverse = True):
             """Check if the iterable is sorted, possibly reverse sorted."""
     
             def pairwise(iterable):
@@ -73,14 +74,19 @@ def bruteNonIntegerIntersection(dim, radius, num_points = 5, lower_bound = -1, u
         return filtered_array
     
     # Define lattice range
-    coord_array = list(np.linspace(lower_bound,upper_bound,num=num_points,endpoint=True))
+    coord_array = list(np.linspace(lower_bound,upper_bound,num = num_points, endpoint = True))
     lattice_coordinates = [coord_array for i in range(dim)]
     
     # Generate vectors on the hypercube
-    flat_grid = np.array(np.meshgrid(*lattice_coordinates)).T.reshape(-1,dim)
-    
+    try:
+        flat_grid = np.array(np.meshgrid(*lattice_coordinates)).T.reshape(-1,dim)
+    except MemoryError:
+        print ("Ran out of memory for density", num_points)
+        return 0
+        
+        
     # Generate lattice
-    norms = np.linalg.norm(flat_grid,ord=2,axis=1)
+    norms = np.linalg.norm(flat_grid, ord = 2, axis = 1)
     close_norms = [True if math.isclose(np.linalg.norm(x),radius,rel_tol=r_tol) == True else False for x in norms]
     small_norms = [True if x <= radius else False for x in norms]
     indices = [x or y for x,y in zip(small_norms,close_norms)]
@@ -489,3 +495,17 @@ def recover_synthetic_datasets(sample_indices, features, targets, batch_size, di
         #    synthetic_data_sets.append(np.concatenate((feature_matrix, targets[target_index - 1,:].reshape(targets.shape[1],1)), axis = 1))
         
     return synthetic_data_sets 
+
+def get_optimal_datasets(results, features, targets, batch_size, dim):
+    # First we extract the maximum scaled utilities for each batch in an array
+    partial_maxima = np.array([elem[0] for elem in results])
+    # Then we return the indices in the array where the maxima occur - the maximum might exist in multiple batches
+    maxima_indices = np.argwhere( np.isclose(partial_maxima - np.max(partial_maxima), 0.0, rtol = 1e-9))
+    maxima_indices = list(chain.from_iterable(maxima_indices))
+    # Now we just merge the tuples of indices where the maximum scaled utilities have been identified in combs_array
+    combs_array = []
+    for index in maxima_indices:
+        combs_array.extend(results[index][3])
+    # And finally we reconstruct the datasets which generate the corresponding scaled utilities
+    synthetic_datasets = recover_synthetic_datasets(combs_array, features, targets, batch_size, dim)
+    return synthetic_datasets
