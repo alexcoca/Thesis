@@ -572,7 +572,7 @@ class OutcomeSpaceGenerator(FileManager):
         # print ("Max scaled utility", self.max_scaled_utility)
         
 class Sampler(FileManager):
-    def __init__(self, directory = '', filenames = [], num_samples = 5, n_batches = 0, partition_method = 'fast', seed = 23,\
+    def __init__(self, directory = '', filenames = [], num_samples = 5, sampling_workers = -1, n_batches = 0, partition_method = 'fast', seed = 23,\
                  samples_only = False, sample_parallel = False, load_data = False , sampling_parameters = {}):
         
         # Initialise FileManager class
@@ -580,6 +580,7 @@ class Sampler(FileManager):
         
         # Properties that should be set explicitly during initialisation
         self.num_samples  = num_samples
+        self.sampling_workers = sampling_workers
         self.partition_method = partition_method
         self.sample_parallel = sample_parallel
         self.load_data = load_data
@@ -732,7 +733,24 @@ class Sampler(FileManager):
     
     def get_samples_parallel(self, batches_partitions):
         print ("Starting parallel sampling procedure")
-        workers = min(self.num_samples, os.cpu_count())
+        # Set number of cores for sampling procedure
+        if self.num_samples > os.cpu_count():
+            if self.sampling_workers == -1:
+                workers = os.cpu_count()
+            else:
+                if self.sampling_workers < os.cpu_count():
+                    workers = self.sampling_workers
+                else:
+                    workers = os.cpu_count()
+        else:
+            if self.sampling_workers == -1:
+                workers = os.cpu_count()
+            elif self.sampling_workers > self.num_samples:
+                workers = self.num_samples
+            else:
+                workers = self.sampling_workers
+        print("Parallel sampling operating on {} cores".format(str(workers)))
+        # workers = min(self.num_samples, os.cpu_count())
         pool = Pool(workers)
         samples = pool.imap(self.process_sample, batches_partitions)
         pool.close()
@@ -912,7 +930,7 @@ class SyntheticDataGenerator(FileManager):
     
     def __init__(self, private_data, OutcomeSpace, Sampler, privacy_constant = 0.1, 
                  num_points_features = 8 , num_points_targets = 5 , \
-                 feat_latt_path = '', target_latt_path = '', seed = 23):
+                 feat_latt_path = '', target_latt_path = '', seed = 23, allow_overwrite = False):
         ''' Parameters:
             @ private_data: an object containing the private data. Features are stored
             in the private_data.features and targets in private_data.targets.
@@ -959,6 +977,9 @@ class SyntheticDataGenerator(FileManager):
         
         # Random number generation properties
         self.seed = seed 
+        
+        # Miscellaneous
+        self.allow_overwrite = allow_overwrite # Flag that allows the DataLog to be overwritten
         
     def initilise_lattices(self):        
         
@@ -1107,7 +1128,7 @@ class SyntheticDataGenerator(FileManager):
         self.save_synthetic_data(self.synthetic_datasets, self.sampler.directory, experiment_name)
         # print ("The sampled datasets are", self.synthetic_datasets)
         path = self.sampler.basename + "/" + experiment_name + "/DataLog/"
-        self.save(self.sampling_parameters, path, experiment_name)
+        self.save(self.sampling_parameters, path, experiment_name, allow_overwrite = self.allow_overwrite)
         
         return self.sampling_parameters
 

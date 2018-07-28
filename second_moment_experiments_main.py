@@ -15,8 +15,8 @@ import time
 
 def second_order_moment_experiment(dimensionality = 2, num_records = 20, test_frac = 0.5, batch_size = 7500, directory = '',\
                                    parallel = True, save_data = False, partition_method = 'fast_2', workers = -1, \
-                                   num_samples = 25, samples_only = False, sample_parallel = True, load_data = False,\
-                                   num_points_targets = 10, num_points_features = 10, epsilon = 0.1, seed = 23):
+                                   sampling_workers = -1, num_samples = 25, samples_only = False, sample_parallel = True, load_data = False,\
+                                   num_points_targets = 10, num_points_features = 10, epsilon = 0.1, seed = 23, allow_overwrite = False):
     # Initialise private_data object
     # '__spec__' = None
     private_data = ContinuousGenerator(d = dimensionality, n = num_records)
@@ -27,14 +27,14 @@ def second_order_moment_experiment(dimensionality = 2, num_records = 20, test_fr
                                                   workers = workers, partition_method = partition_method, save_data = save_data)
     
     # Initialise Sampler() object
-    SamplerInstance = Sampler(num_samples = num_samples, partition_method = partition_method, \
+    SamplerInstance = Sampler(num_samples = num_samples, sampling_workers = sampling_workers, partition_method = partition_method, \
                               samples_only = samples_only, sample_parallel = sample_parallel, \
                               load_data = load_data)
     
     # Initialise SyntheticDataGenerator() object 
     SyntheticData = SyntheticDataGenerator(private_data, OutcomeSpace, SamplerInstance, privacy_constant = epsilon,\
                                            num_points_features = num_points_features, num_points_targets = num_points_targets, \
-                                           seed = seed)
+                                           seed = seed, allow_overwrite = allow_overwrite)
      
     t_start = time.time()
     results = SyntheticData.generate_data(property_preserved = 'second_moments')
@@ -76,7 +76,9 @@ if __name__ == '__main__':
     save_data = False
     partition_method = 'fast_2'
     workers = -1
-    num_samples = 100
+    sampling_workers = -1
+    allow_overwrite = False
+    num_samples = 50
     sample_parallel = False
     load_data = False
     num_points_targets = 5
@@ -85,9 +87,9 @@ if __name__ == '__main__':
     seed = 23
     data = second_order_moment_experiment(dimensionality = dimensionality, num_records = num_records, batch_size = batch_size, \
                                             directory = directory, parallel = parallel, save_data = save_data, partition_method = partition_method, \
-                                            workers = workers, num_samples= num_samples, sample_parallel = sample_parallel, load_data = load_data, \
+                                            workers = workers, sampling_workers = sampling_workers, num_samples= num_samples, sample_parallel = sample_parallel, load_data = load_data, \
                                             num_points_targets = num_points_targets, num_points_features = num_points_features, epsilon = epsilon, \
-                                            seed = seed)
+                                            seed = seed, allow_overwrite = allow_overwrite)
 
 
 

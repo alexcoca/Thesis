@@ -7,6 +7,7 @@ Created on Mon Jul  2 11:18:23 2018
 
 import pickle, os
 import numpy as np
+import shutil
 
 class FileManager(object):
     
@@ -19,7 +20,7 @@ class FileManager(object):
             batch_scores = pickle.load(data)
         return batch_scores
     
-    def retrieve_scores(self,filenames,batches=[]):
+    def retrieve_scores(self, filenames, batches = []):
         """ This method unpickles the files listed in the @filenames list, 
         returning a list containing the contents of the unpickled files.
         If @batches list is specified, then only the files to the corresponding
@@ -82,7 +83,7 @@ class FileManager(object):
         
         raise NotImplementedError
         
-    def save(self, data, path, filename):
+    def save(self, data, path, filename, allow_overwrite = False):
         
         if not os.path.exists(path):
             os.makedirs(path)
@@ -90,7 +91,10 @@ class FileManager(object):
         fullpath =  path + "/" + filename     
         
         if os.path.exists(fullpath):
-            raise FileExistsError("Please delete or copy the old data!")
+            if not allow_overwrite:
+                raise FileExistsError("Please delete or copy the old data!")
+            else:
+                os.remove(fullpath)
             
         with open(fullpath ,"wb") as container:
             pickle.dump(data, container)
