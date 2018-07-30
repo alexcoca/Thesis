@@ -1093,7 +1093,7 @@ class SyntheticDataGenerator(FileManager):
         self.property_preserved = property_preserved
         
         # Define experiment name
-        experiment_name = "s_eps" + str(self.epsilon).replace(".","") + "d" + \
+        experiment_name = "s" + str(self.seed) + "_eps" + str(self.epsilon).replace(".","") + "d" + \
                                 str(self.dimensionality) + "nt" + str(self.num_points_targets) + \
                                 "nf" + str(self.num_points_features)
         
