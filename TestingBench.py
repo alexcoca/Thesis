@@ -90,16 +90,16 @@ import testutilities
 import numpy as np
 import math
 
-dim = 10
-num_points = 10
-upper_bound = 1.0
-lower_bound = -1.0
-num_dec = 4
-radius = 1.0
-r_tol = 1e-5
+#dim = 10
+#num_points = 10
+#upper_bound = 1.0
+#lower_bound = -1.0
+#num_dec = 4
+#radius = 1.0
+#r_tol = 1e-5
 #OutputLattice = FeaturesLattice()
 #OutputLattice.generate_l2_lattice(dim=dim,radius=radius,lower_bound=lower_bound,upper_bound=upper_bound,num_points=num_points,pos_ord=True,rel_tol=r_tol)
-intersection_m2 = testutilities.bruteNonIntegerIntersection(dim=dim,radius=radius,num_points=num_points,lower_bound=lower_bound,upper_bound=upper_bound,filtered = False,r_tol=r_tol)
+#intersection_m2 = testutilities.bruteNonIntegerIntersection(dim=dim,radius=radius,num_points=num_points,lower_bound=lower_bound,upper_bound=upper_bound,filtered = False,r_tol=r_tol)
 #test_points = OutputLattice.points
 # Points that are returned by the fancy algorithm but not by brute
 #differences_1 = testutilities.get_differences(test_points,intersection_m2)
@@ -873,89 +873,89 @@ def compare_sampled_indices(sample_1, sample_2, length = 4):
 utility_arrays = [] # Utility arrays
 
 # Declare experiment parameters
-dim = 2
-num_points_feat = 14
-num_points_targ = 14
-batch_size = 100
-n_private = 40
-
-# Declare privacy paramters
-epsilon = 0.1
-scaled_epsilon = epsilon/2 
-# Declare synthetic space elements
-OutputLattice = FeaturesLattice()
-OutputLattice.generate_l2_lattice(dim = dim, num_points = num_points_feat)
-features = OutputLattice.points
-OutputLattice2 = TargetsLattice()
-OutputLattice2.generate_lattice(dim = dim, num_points = num_points_targ)
-targets = OutputLattice2.points
-
-# Generate synthethic data and compute its utility
-private_data = ContinuousGenerator(d = dim, n = n_private)
-private_data.generate_data(test_frac = 0.5)
-print ("Coefficients of the model from which the private data was generated are", private_data.coefs)
-F_tilde_x = testutilities.get_private_F_tilde(private_data)
-
-# Inverse global sensitivity
-igs = private_data.features.shape[0]/2 
-
-# Utility scaling constant 
-scaling_const = igs*scaled_epsilon
-
-# Calculate number of batches
-n_batches = math.ceil(comb(features.shape[0], dim, exact = True)/batch_size)
-print ("Number of batches is", n_batches)
-# Define directory where the files will be saved
-experiment_name = 'test_struct_integrity'
-directory = 'C:/Users/alexc/OneDrive/Documents/GitHub/Thesis/Experiments/' + experiment_name + '/OutcomeSpace'
-
-# Define file name for scores (s) storage
-base_filename_s = "s_eps" + str(epsilon).replace(".", "") + "d" + str(dim)
-
-t_start = time.time()
-results = []
-for batch_index in range(n_batches):
-    results.append(testutilities.evaluate_sample_score(batch_index, features, targets, scaling_const, F_tilde_x, dim, batch_size, \
-                                                       base_filename_s, directory))
-t_elapsed = time.time()
-
-
-print("Time elapsed for single core processing of this small case is..." + " " + str(t_elapsed - t_start))
-
-# Get the data sets that have maximum utility
-
-# First we extract the maximum scaled utilities for each batch in an array
-partial_maxima = np.array([elem[0] for elem in results])
-# Then we return the indices in the array where the maxima occur - the maximum might exist in multiple batches
-maxima_indices = np.argwhere( np.isclose(partial_maxima - np.max(partial_maxima), 0.0, rtol = 1e-9))
-maxima_indices = list(chain.from_iterable(maxima_indices))
-# Now we just merge the tuples of indices where the maximum scaled utilities have been identified in combs_array
-combs_array = []
-for index in maxima_indices:
-    combs_array.extend(results[index][3])
-# And finally we reconstruct the datasets which generate the corresponding scaled utilities
-optimal_synthetic_datasets = np.array(testutilities.recover_synthetic_datasets(combs_array, features, targets, batch_size, dim))
-
-res = np.exp(results[0][1]).flatten().tolist()
-res_freqs = collections.Counter(res)
-# Test that data reloading function works - seems to work fine
-
-if directory.rfind("*") == -1:
-    directory = directory + "/*"
-
-# We pass filenames to the data loader to avoid calling glob.glob for every sampling step
-filenames = glob.glob(directory)
-
-reloaded_data = testutilities.retrieve_scores(filenames)
-
-is_diff = []
-rtol = 1e-05
-
-for reloaded_element,returned_element in zip(reloaded_data,results):
-    difference = reloaded_element['scores'] - returned_element[1]
-    is_diff.append(np.all(np.isclose(difference,np.zeros(shape=difference.shape),rtol=rtol)))
-
-assert np.all(is_diff)
+#dim = 2
+#num_points_feat = 5
+#num_points_targ = 3
+#batch_size = 100
+#n_private = 40
+#
+## Declare privacy paramters
+#epsilon = 0.2
+#scaled_epsilon = epsilon/2 
+## Declare synthetic space elements
+#OutputLattice = FeaturesLattice()
+#OutputLattice.generate_l2_lattice(dim = dim, num_points = num_points_feat)
+#features = OutputLattice.points
+#OutputLattice2 = TargetsLattice()
+#OutputLattice2.generate_lattice(dim = dim, num_points = num_points_targ)
+#targets = OutputLattice2.points
+#
+## Generate synthethic data and compute its utility
+#private_data = ContinuousGenerator(d = dim, n = n_private)
+#private_data.generate_data(test_frac = 0.5)
+#print ("Coefficients of the model from which the private data was generated are", private_data.coefs)
+#F_tilde_x = testutilities.get_private_F_tilde(private_data)
+#
+## Inverse global sensitivity
+#igs = private_data.features.shape[0]/2 
+#
+## Utility scaling constant 
+#scaling_const = igs*scaled_epsilon
+#
+## Calculate number of batches
+#n_batches = math.ceil(comb(features.shape[0], dim, exact = True)/batch_size)
+#print ("Number of batches is", n_batches)
+## Define directory where the files will be saved
+#experiment_name = 'test_struct_integrity'
+#directory = 'C:/Users/alexc/OneDrive/Documents/GitHub/Thesis/Experiments/' + experiment_name + '/OutcomeSpace'
+#
+## Define file name for scores (s) storage
+#base_filename_s = "s_eps" + str(epsilon).replace(".", "") + "d" + str(dim)
+#
+#t_start = time.time()
+#results = []
+#for batch_index in range(n_batches):
+#    results.append(testutilities.evaluate_sample_score(batch_index, features, targets, scaling_const, F_tilde_x, dim, batch_size, \
+#                                                       base_filename_s, directory))
+#t_elapsed = time.time()
+#
+#
+#print("Time elapsed for single core processing of this small case is..." + " " + str(t_elapsed - t_start))
+#
+## Get the data sets that have maximum utility
+#
+## First we extract the maximum scaled utilities for each batch in an array
+#partial_maxima = np.array([elem[0] for elem in results])
+## Then we return the indices in the array where the maxima occur - the maximum might exist in multiple batches
+#maxima_indices = np.argwhere( np.isclose(partial_maxima - np.max(partial_maxima), 0.0, rtol = 1e-9))
+#maxima_indices = list(chain.from_iterable(maxima_indices))
+## Now we just merge the tuples of indices where the maximum scaled utilities have been identified in combs_array
+#combs_array = []
+#for index in maxima_indices:
+#    combs_array.extend(results[index][3])
+## And finally we reconstruct the datasets which generate the corresponding scaled utilities
+#optimal_synthetic_datasets = np.array(testutilities.recover_synthetic_datasets(combs_array, features, targets, batch_size, dim))
+#
+#res = np.exp(results[0][1]).flatten().tolist()
+#res_freqs = collections.Counter(res)
+## Test that data reloading function works - seems to work fine
+#
+#if directory.rfind("*") == -1:
+#    directory = directory + "/*"
+#
+## We pass filenames to the data loader to avoid calling glob.glob for every sampling step
+#filenames = glob.glob(directory)
+#
+#reloaded_data = testutilities.retrieve_scores(filenames)
+#
+#is_diff = []
+#rtol = 1e-05
+#
+#for reloaded_element,returned_element in zip(reloaded_data,results):
+#    difference = reloaded_element['scores'] - returned_element[1]
+#    is_diff.append(np.all(np.isclose(difference,np.zeros(shape=difference.shape),rtol=rtol)))
+#
+#assert np.all(is_diff)
 
 # Test reloading of only some batches - seems to work fine!
 
@@ -976,45 +976,45 @@ assert np.all(is_diff)
  
 # Calculating the partition function...
 
-if directory.rfind("*") == -1:
-    directory = directory + "/*"
-
-# We pass filenames to the data loader to avoid calling glob.glob for every sampling step
-filenames = glob.glob(directory)
-
-# Calculate max_score for sum-exp trick
-max_scaled_utility = - math.inf
-
-for result in results:
-    if result[0] > max_scaled_utility:
-        max_scaled_utility = result[0]
- 
-print ("Max scaled utility, simple method", max_scaled_utility)
-print ("Max utility, simple method", 1/scaling_const* max_scaled_utility)
-
-# Calculate partition function (without sum_exp)
-
-raw_partition_function = 0
-debug_partition_function = 0
-
-for result in results:
-    raw_partition_function += np.sum(np.exp(result[1]))
-    
-intermediate_partition_values = []    
-    
-for result in results:
-    intermediate_partition_values.append(np.sum(np.exp(result[1] - max_scaled_utility)))
-    debug_partition_function += np.sum(np.exp(result[1] - max_scaled_utility))
-    
-print ("Raw partition value", raw_partition_function)
-print ("Debug partition function value", debug_partition_function)
-
-# Calculate partition function (using sum_exp) 
-partition_function = calculate_partition_function(filenames, n_batches, test = False, max_score = 0.0)
-
-print ("Sum-exp partition value",partition_function)
-
-filenames_orig = [filename for filename in glob.glob(directory) if filename.find("orig_") >= 0]
+#if directory.rfind("*") == -1:
+#    directory = directory + "/*"
+#
+## We pass filenames to the data loader to avoid calling glob.glob for every sampling step
+#filenames = glob.glob(directory)
+#
+## Calculate max_score for sum-exp trick
+#max_scaled_utility = - math.inf
+#
+#for result in results:
+#    if result[0] > max_scaled_utility:
+#        max_scaled_utility = result[0]
+# 
+#print ("Max scaled utility, simple method", max_scaled_utility)
+#print ("Max utility, simple method", 1/scaling_const* max_scaled_utility)
+#
+## Calculate partition function (without sum_exp)
+#
+#raw_partition_function = 0
+#debug_partition_function = 0
+#
+#for result in results:
+#    raw_partition_function += np.sum(np.exp(result[1]))
+#    
+#intermediate_partition_values = []    
+#    
+#for result in results:
+#    intermediate_partition_values.append(np.sum(np.exp(result[1] - max_scaled_utility)))
+#    debug_partition_function += np.sum(np.exp(result[1] - max_scaled_utility))
+#    
+#print ("Raw partition value", raw_partition_function)
+#print ("Debug partition function value", debug_partition_function)
+#
+## Calculate partition function (using sum_exp) 
+#partition_function = calculate_partition_function(filenames, n_batches, test = False, max_score = 0.0)
+#
+#print ("Sum-exp partition value",partition_function)
+#
+#filenames_orig = [filename for filename in glob.glob(directory) if filename.find("orig_") >= 0]
 
 # Check that the original data has not been corrupted when written to file...
 
@@ -1048,136 +1048,136 @@ filenames_orig = [filename for filename in glob.glob(directory) if filename.find
 #    difference = exp_val - data_modified['scores']
 #   # assert np.all(np.isclose(difference,np.zeros(shape=difference.shape),rtol=rtol))
    
-partition_function_alt = calculate_partition_function_alt(iter(results))
-
-print ("Alternative method for calculating partition function gives", partition_function_alt)
-
-# Now let's test the sampling procedure...
-
-num_samples = 250
-seed = 23
-
-sample_indices = sample_dataset(n_batches, num_samples, raw_partition_function, filenames, seed)
-
-# Use another method to calculate partition function given the output of the sampling function
-            
-partition_residuals = testutilities.check_sampling(sample_indices, results, max_score = 0.0)
-print ("Partition residuals for the old method with seed " + str(seed) + " are:", partition_residuals)
-
-# Modify column indices and calculate residuals - they should be negative
-
-list_conversion = [list(element) for element in sample_indices]
-# deprecated: sample_indices_modified = [[batch_index, row_index, col_index + 1, part_function] for batch_index, row_index, col_index, part_function in list_conversion]
-sample_indices_modified = [[batch_index, row_index, col_index - 1, part_function] for batch_index, row_index, col_index, part_function in list_conversion]
+#partition_function_alt = calculate_partition_function_alt(iter(results))
 #
-partition_mod_residuals = testutilities.check_sampling(sample_indices_modified, results, max_score = 0.0)    
-
-print ("Partition residuals for the old method with seed" + str(seed) + "are:", partition_mod_residuals)
-
-# depracted mask = [True if element <= 0 else False for element in partition_mod_residuals]
-
-mask = [True if element >= 0.0 else False for element in partition_mod_residuals]
-
-assert (all(mask))
-
-# And finally the matrix recovery procedure...   
-
-synthetic_data_sets = np.array(testutilities.recover_synthetic_datasets(sample_indices, features, targets, batch_size, dim ))
-synthetic_data_sets_alternative =  np.array(testutilities.recover_synthetic_datasets(sample_indices, features, targets, batch_size, dim))
-#print ("The data sets sampled are", synthetic_data_sets)
-
-# Recalculate scores and utilities based on the recovered synthetic data sets
-calculated_scores, calculated_scaled_utilities, _ = testutilities.calculate_recovered_scores(synthetic_data_sets, F_tilde_x, scaling_const, dim)
-
-samples_utilities =  np.array((1/scaling_const)*calculated_scaled_utilities)
-
-print("Samples utilities", samples_utilities)
-print("Samples scaled utilities", calculated_scaled_utilities)
-print("Samples scores", calculated_scores)
-print("Samples utilities (average)", np.mean(samples_utilities))
-print("Samples utilties (standard dev)", np.std(samples_utilities))
-
-samples_utilities_freqs = collections.Counter(samples_utilities)
-calculated_scaled_utilities_freqs = collections.Counter(calculated_scaled_utilities)
-calculated_scores_freqs = collections.Counter(calculated_scores)
-
-# Retrieve the scores from the raw results
-# This assumes the results contain RAW results (aka exp not taken)
-look_up_scores = testutilities.retrieve_scores_from_results(results, sample_indices, max_scaled_utility = 0.0)        
-
-# Compare retrieved and calculated scores
-assert  np.all(np.isclose(np.array(calculated_scores), np.array(look_up_scores), rtol = rtol))
-
-# New sampling methodology test
-seed = 23
-new_sample_indices = sample_datasets_new(num_samples, filenames, raw_partition_function, seed)
-
-new_partition_residuals = testutilities.check_sampling(new_sample_indices, results,max_score = 0.0)
-
-print ("Partition subtracted for the new algorithm is", new_partition_residuals)
-
-# Compare sample indices 
-compare_sampled_indices(sample_indices, new_sample_indices)
-
-
-list_conversion = [list(element) for element in new_sample_indices]
-# deprecatedd: new_sample_indices_modified = [[batch_index, row_index, col_index + 1, part_function] for batch_index, row_index, col_index, part_function in list_conversion]
-
-new_sample_indices_modified = [[batch_index, row_index, col_index - 1, part_function] for batch_index, row_index, col_index, part_function in list_conversion]
-new_partition_check = testutilities.check_sampling(new_sample_indices_modified, results,max_score = 0.0)
-
-print ("Partition subtracted for the new algorithm is (check)", new_partition_check)
-
-# Calculate accuraccies
-print("Accuracies of current sampling implementation")
-calculate_accuracy(synthetic_data_sets, dim, F_tilde_x)
-print("Accuracies of alternative sampling implementation")
-calculate_accuracy(synthetic_data_sets_alternative, dim, F_tilde_x)
-
-# Check regression results
-netmech_regressor = Regression()
-# regressor_alternative = Regression()
-
-param = netmech_regressor.fit_data(synthetic_data_sets)
-predictive_err_netmech = netmech_regressor.calculate_predictive_error(private_data.test_data, param)
-#print ("Predictive_errors for net mechanism", predictive_err_netmech)
-print ("Min predictive error net mechanism", np.min(predictive_err_netmech))
-print ("Mean predictive error net mechanism", np.mean(predictive_err_netmech))
-print ("Std of predictive err net mechanism", np.std(predictive_err_netmech))
-
-optimal_netmech_regressor = Regression()
-optimal_param = netmech_regressor.fit_data(optimal_synthetic_datasets)
-optimal_predictive_err_netmech = optimal_netmech_regressor.calculate_predictive_error(private_data.test_data, optimal_param)
-print ("Min predictive error net mechanism (optimal outcomes)", np.min(predictive_err_netmech))
-print ("Mean predictive error net mechanism (optimal outcomes)", np.mean(predictive_err_netmech))
-
-
-# Fit pamaters with ADASSP algorithm
-
-adassp_regressor = DPRegression()
-adassp_reg_coef = adassp_regressor.get_parameters(private_data.features, private_data.targets, num_samples, epsilon)
-predictive_err_adassp = Regression().calculate_predictive_error(private_data.test_data, adassp_reg_coef)
-# print ("Predictive_errors for adassp", predictive_err_adassp)
-print ("Min predictive error adassp", np.min(predictive_err_adassp))
-print ("Mean predictive error adassp", np.mean(predictive_err_adassp))
-print ("Std of predictive err adassp", np.std(predictive_err_adassp))
-
-
-# Calculate Frobenius norm of the covariance difference  and the 2-norm of the correlations difference
-emp_cov_synth = 1/dim * np.transpose(synthetic_data_sets[:,:,:-1], axes = (0,2,1))@synthetic_data_sets[:,:,:-1]
-emp_corr = 1/dim * np.transpose(synthetic_data_sets[:,:,:-1], axes = (0,2,1))@synthetic_data_sets[:,:,-1:]
-
-delta_cov = F_tilde_x[:,:-1] - emp_cov_synth
-delta_corr = F_tilde_x[:,-1:] - emp_corr
-
-delta_cov_norms_f = np.linalg.norm(delta_cov, ord = 'fro', axis = (1,2))
-delta_cov_norms_2 = np.linalg.norm(delta_cov, ord = 2, axis = (1,2))
-delta_corr_norms_2 = np.linalg.norm(delta_corr, ord = 2, axis = 1)
-
-avg_f_norm_cov = np.mean(delta_cov_norms_f)
-std_f_norm_cov = np.std(delta_cov_norms_f)
-avg_2_norm_corr = np.mean(delta_corr_norms_2)
-std_2_norm_corr = np.std(delta_corr_norms_2)
+#print ("Alternative method for calculating partition function gives", partition_function_alt)
+#
+## Now let's test the sampling procedure...
+#
+#num_samples = 25
+#seed = 23
+#
+#sample_indices = sample_dataset(n_batches, num_samples, raw_partition_function, filenames, seed)
+#
+## Use another method to calculate partition function given the output of the sampling function
+#            
+#partition_residuals = testutilities.check_sampling(sample_indices, results, max_score = 0.0)
+#print ("Partition residuals for the old method with seed " + str(seed) + " are:", partition_residuals)
+#
+## Modify column indices and calculate residuals - they should be negative
+#
+#list_conversion = [list(element) for element in sample_indices]
+## deprecated: sample_indices_modified = [[batch_index, row_index, col_index + 1, part_function] for batch_index, row_index, col_index, part_function in list_conversion]
+#sample_indices_modified = [[batch_index, row_index, col_index - 1, part_function] for batch_index, row_index, col_index, part_function in list_conversion]
+##
+#partition_mod_residuals = testutilities.check_sampling(sample_indices_modified, results, max_score = 0.0)    
+#
+#print ("Partition residuals for the old method with seed" + str(seed) + "are:", partition_mod_residuals)
+#
+## depracted mask = [True if element <= 0 else False for element in partition_mod_residuals]
+#
+#mask = [True if element >= 0.0 else False for element in partition_mod_residuals]
+#
+#assert (all(mask))
+#
+## And finally the matrix recovery procedure...   
+#
+#synthetic_data_sets = np.array(testutilities.recover_synthetic_datasets(sample_indices, features, targets, batch_size, dim ))
+#synthetic_data_sets_alternative =  np.array(testutilities.recover_synthetic_datasets(sample_indices, features, targets, batch_size, dim))
+##print ("The data sets sampled are", synthetic_data_sets)
+#
+## Recalculate scores and utilities based on the recovered synthetic data sets
+#calculated_scores, calculated_scaled_utilities, _ = testutilities.calculate_recovered_scores(synthetic_data_sets, F_tilde_x, scaling_const, dim)
+#
+#samples_utilities =  np.array((1/scaling_const)*calculated_scaled_utilities)
+#
+#print("Samples utilities", samples_utilities)
+#print("Samples scaled utilities", calculated_scaled_utilities)
+#print("Samples scores", calculated_scores)
+#print("Samples utilities (average)", np.mean(samples_utilities))
+#print("Samples utilties (standard dev)", np.std(samples_utilities))
+#
+#samples_utilities_freqs = collections.Counter(samples_utilities)
+#calculated_scaled_utilities_freqs = collections.Counter(calculated_scaled_utilities)
+#calculated_scores_freqs = collections.Counter(calculated_scores)
+#
+## Retrieve the scores from the raw results
+## This assumes the results contain RAW results (aka exp not taken)
+#look_up_scores = testutilities.retrieve_scores_from_results(results, sample_indices, max_scaled_utility = 0.0)        
+#
+## Compare retrieved and calculated scores
+#assert  np.all(np.isclose(np.array(calculated_scores), np.array(look_up_scores), rtol = rtol))
+#
+## New sampling methodology test
+#seed = 23
+#new_sample_indices = sample_datasets_new(num_samples, filenames, raw_partition_function, seed)
+#
+#new_partition_residuals = testutilities.check_sampling(new_sample_indices, results,max_score = 0.0)
+#
+#print ("Partition subtracted for the new algorithm is", new_partition_residuals)
+#
+## Compare sample indices 
+#compare_sampled_indices(sample_indices, new_sample_indices)
+#
+#
+#list_conversion = [list(element) for element in new_sample_indices]
+## deprecatedd: new_sample_indices_modified = [[batch_index, row_index, col_index + 1, part_function] for batch_index, row_index, col_index, part_function in list_conversion]
+#
+#new_sample_indices_modified = [[batch_index, row_index, col_index - 1, part_function] for batch_index, row_index, col_index, part_function in list_conversion]
+#new_partition_check = testutilities.check_sampling(new_sample_indices_modified, results,max_score = 0.0)
+#
+#print ("Partition subtracted for the new algorithm is (check)", new_partition_check)
+#
+## Calculate accuraccies
+#print("Accuracies of current sampling implementation")
+#calculate_accuracy(synthetic_data_sets, dim, F_tilde_x)
+#print("Accuracies of alternative sampling implementation")
+#calculate_accuracy(synthetic_data_sets_alternative, dim, F_tilde_x)
+#
+## Check regression results
+#netmech_regressor = Regression()
+## regressor_alternative = Regression()
+#
+#param = netmech_regressor.fit_data(synthetic_data_sets)
+#predictive_err_netmech = netmech_regressor.calculate_predictive_error(private_data.test_data, param)
+##print ("Predictive_errors for net mechanism", predictive_err_netmech)
+#print ("Min predictive error net mechanism", np.min(predictive_err_netmech))
+#print ("Mean predictive error net mechanism", np.mean(predictive_err_netmech))
+#print ("Std of predictive err net mechanism", np.std(predictive_err_netmech))
+#
+#optimal_netmech_regressor = Regression()
+#optimal_param = netmech_regressor.fit_data(optimal_synthetic_datasets)
+#optimal_predictive_err_netmech = optimal_netmech_regressor.calculate_predictive_error(private_data.test_data, optimal_param)
+#print ("Min predictive error net mechanism (optimal outcomes)", np.min(predictive_err_netmech))
+#print ("Mean predictive error net mechanism (optimal outcomes)", np.mean(predictive_err_netmech))
+#
+#
+## Fit pamaters with ADASSP algorithm
+#
+#adassp_regressor = DPRegression()
+#adassp_reg_coef = adassp_regressor.get_parameters(private_data.features, private_data.targets, num_samples, epsilon)
+#predictive_err_adassp = Regression().calculate_predictive_error(private_data.test_data, adassp_reg_coef)
+## print ("Predictive_errors for adassp", predictive_err_adassp)
+#print ("Min predictive error adassp", np.min(predictive_err_adassp))
+#print ("Mean predictive error adassp", np.mean(predictive_err_adassp))
+#print ("Std of predictive err adassp", np.std(predictive_err_adassp))
+#
+#
+## Calculate Frobenius norm of the covariance difference  and the 2-norm of the correlations difference
+#emp_cov_synth = 1/dim * np.transpose(synthetic_data_sets[:,:,:-1], axes = (0,2,1))@synthetic_data_sets[:,:,:-1]
+#emp_corr = 1/dim * np.transpose(synthetic_data_sets[:,:,:-1], axes = (0,2,1))@synthetic_data_sets[:,:,-1:]
+#
+#delta_cov = F_tilde_x[:,:-1] - emp_cov_synth
+#delta_corr = F_tilde_x[:,-1:] - emp_corr
+#
+#delta_cov_norms_f = np.linalg.norm(delta_cov, ord = 'fro', axis = (1,2))
+#delta_cov_norms_2 = np.linalg.norm(delta_cov, ord = 2, axis = (1,2))
+#delta_corr_norms_2 = np.linalg.norm(delta_corr, ord = 2, axis = 1)
+#
+#avg_f_norm_cov = np.mean(delta_cov_norms_f)
+#std_f_norm_cov = np.std(delta_cov_norms_f)
+#avg_2_norm_corr = np.mean(delta_corr_norms_2)
+#std_2_norm_corr = np.std(delta_corr_norms_2)
 # param_alternative = regressor_alternative.fit_data(synthetic_data_sets_alternative)
 # param_alternative_2 = regressor_alternative2.fit_data(synthetic_data_sets_alternative_2)
 
@@ -1331,16 +1331,166 @@ std_2_norm_corr = np.std(delta_corr_norms_2)
 #                  str(list(num_points_features_vec)[np.argmin(np.array(mean_predictive_errs_netmech[epsilon]))])))
 #%% 
 # Plot the dataset 
-from data_generators import ContinuousGenerator
+#from data_generators import ContinuousGenerator
+#import numpy as np
+#dimensionality = 2
+#num_records = 40
+#test_frac = 0.5
+#private_data = ContinuousGenerator(d = dimensionality, n = num_records)
+#private_data.generate_data(test_frac = test_frac)   
+## private_data.plot_data()
+#
+#test_features = private_data.test_features
+#test_features_norms = np.linalg.norm(test_features, ord = 2, axis = 1)
+#train_data = private_data.data
+#%% Testing data analysis framework for the multiple data sets case
+ 
+import second_moment_experiments_main as experiment
+import pickle
+import matplotlib
+import matplotlib.pyplot as plt
+plt.rc('text', usetex = True)
+plt.rc('font', family = 'serif')
+matplotlib.rc('xtick', labelsize=14) 
+matplotlib.rc('ytick', labelsize=14) 
+from exputils import extract_data, initialise_netmech_containers, initialise_adassp_reg_containers, initialise_netmech_reg_containers 
+from baselines import Regression, DPRegression
 import numpy as np
+
+
+def get_expected_statistics(avg_samples_utility, mean_predictive_errs_netmech, double_std_predictive_errs_netmech,\
+                            mean_predictive_err_adassp, double_std_predictive_err_adassp, epsilon_vec):
+    
+    def get_helper(obj, epsilon_vec):
+        helper = {key: [] for key in epsilon_vec}
+        for dataset_number in obj.keys():
+            for epsilon in obj[dataset_number].keys():
+                helper[epsilon].append(obj[dataset_number][epsilon])
+        return helper
+    
+    def get_stats(helper, epsilon_vec, kinds = ['mean']):
+        statistics = [{key: [] for key in epsilon_vec} for _ in range(len(kinds))]
+        for index in range(len(kinds)):
+            if kinds[index] == 'mean':
+                for epsilon in helper.keys():
+                    statistics[index][epsilon] = np.mean(helper[epsilon], axis = 0)
+            if kinds[index] == 'min':
+                for epsilon in helper.keys():
+                    statistics[index][epsilon] = np.min(helper[epsilon], axis = 0)
+            if kinds[index] == 'max':
+                for epsilon in helper.keys():
+                    statistics[index][epsilon] = np.max(helper[epsilon], axis = 0)
+        return tuple(statistics)
+    
+    expected_avg_utility, min_avg_utility, max_avg_utility = get_stats(get_helper(avg_samples_utility, epsilon_vec),\
+                                                                       epsilon_vec, kinds = ['mean','min', 'max'])
+    #expected_mean_predictive_err_adassp =  get_stats(get_helper(mean_predictive_err_adassp, epsilon_vec), epsilon_vec, kind = 'mean')
+    #expected_double_std_predictive_err_adassp = get_stats(get_helper(double_std_predictive_err_adassp, epsilon_vec), epsilon_vec, kind = 'mean')
+    #return expected_avg_utility, expected_mean_predictive_errs_netmech, expected_double_std_predictive_errs_netmech, expected_mean_predictive_errs_adassp,\
+#xpected_double_std_predictive_err_adassp
+    return expected_avg_utility, min_avg_utility, max_avg_utility
+
+# Load data 
+exp_name = 'exp_vary_private_data'
+with open ('D:/Thesis/Experiments/exp_vary_private_data/' + exp_name, "rb") as container:
+    results = pickle.load(container)
+
+# Default parameters list
 dimensionality = 2
 num_records = 40
 test_frac = 0.5
-private_data = ContinuousGenerator(d = dimensionality, n = num_records)
-private_data.generate_data(test_frac = test_frac)   
-# private_data.plot_data()
+batch_size = 1000
+directory = 'D:/Thesis/Experiments/exp_vary_private_data/'
+parallel = False
+save_data = False
+partition_method = 'fast_2'
+workers = -1
+num_samples = 25
+sample_parallel = False 
+load_data = False
 
-test_features = private_data.test_features
-test_features_norms = np.linalg.norm(test_features, ord = 2, axis = 1)
-train_data = private_data.data
+# Experiment specific
+num_points_features_vec = [3, 4, 5]
+num_points_targets_vec = [3, 4, 5]
+num_datasets = 100
+epsilon_vec = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
 
+# Experimental data containers
+max_utilities, avg_samples_utility, synthetic_datasets_vec, test_set, private_data = \
+    initialise_netmech_containers(epsilon_vec, multiple_datasets = True, max_dataset = num_datasets)    
+    
+# Extract data from the results data structure 
+for dataset_number in results.keys():
+    # Quantities that are epsilon independent 
+    fixed_eps = 0.1
+    max_utilities[dataset_number], test_set[dataset_number],private_data[dataset_number] = extract_data(results[dataset_number][fixed_eps],\
+                                                                                                    multiple_datasets = True, \
+                                                                                                    max_dataset = num_datasets, \
+                                                                                                    eps_dependent = False)
+    # Quantities that are epsilon independent
+    for epsilon in results[dataset_number].keys():
+        avg_samples_utility[dataset_number][epsilon], synthetic_datasets_vec[dataset_number][epsilon] = \
+           extract_data(results[dataset_number][epsilon], multiple_datasets = True, max_dataset = num_datasets, \
+                          eps_dependent = True) 
+
+# Initialise containers for the regression on the synthetic data sets released with netmechanism
+net_mech_reg_coefs, predictive_errs_netmech, min_predictive_errs_netmech, mean_predictive_errs_netmech,\
+double_std_predictive_errs_netmech = initialise_netmech_reg_containers(epsilon_vec, multiple_datasets = True,\
+                                                                        max_dataset = num_datasets)
+
+# Initialise containers for the regression on the synthetic data sets with parameters released by ADASSP
+adassp_reg_coef, predictive_err_adassp, min_predictive_err_adassp, mean_predictive_err_adassp, double_std_predictive_err_adassp\
+                                   = initialise_adassp_reg_containers(epsilon_vec, multiple_datasets = True, max_dataset = num_datasets)
+                                  
+# Fit ADASSP to the private dataset and calculate the predictive error
+for dataset_number in results.keys():
+    for epsilon in results[dataset_number].keys():
+        adassp_regressor = DPRegression()
+        adassp_reg_coef[dataset_number][epsilon] = adassp_regressor.get_parameters(private_data[dataset_number].features, \
+                                                                                   private_data[dataset_number].targets,\
+                                                                                   num_samples, epsilon, seed = dataset_number)
+        predictive_err_adassp[dataset_number][epsilon] = Regression().calculate_predictive_error(private_data[dataset_number].test_data, \
+                                                                                                 adassp_reg_coef[dataset_number][epsilon])
+        min_predictive_err_adassp[dataset_number][epsilon] = np.min(predictive_err_adassp[dataset_number][epsilon])
+        mean_predictive_err_adassp[dataset_number][epsilon] = np.mean(predictive_err_adassp[dataset_number][epsilon])
+        double_std_predictive_err_adassp[dataset_number][epsilon] = 2*np.std(predictive_err_adassp[dataset_number][epsilon])
+
+# Perform regression on the datasets released with the net mechanism and calculate predictive error statistics
+for dataset_number in results.keys():
+    for epsilon in results[dataset_number].keys():
+        for synthetic_datasets in synthetic_datasets_vec[dataset_number][epsilon]:
+            netmech_regressor = Regression()
+            net_mech_reg_coef = netmech_regressor.fit_data(synthetic_datasets)
+            net_mech_reg_coefs[dataset_number][epsilon].append(net_mech_reg_coef)
+            predictive_err_netmech = netmech_regressor.calculate_predictive_error(private_data[dataset_number].test_data, \
+                                                                                  net_mech_reg_coef)
+            predictive_errs_netmech[dataset_number][epsilon].append(predictive_err_netmech)
+            min_predictive_errs_netmech[dataset_number][epsilon].append(np.min(predictive_err_netmech))
+            mean_predictive_errs_netmech[dataset_number][epsilon].append(np.mean(predictive_err_netmech))
+            double_std_predictive_errs_netmech[dataset_number][epsilon].append(2*np.std(predictive_err_netmech))
+
+helper_out = {key: [] for key in epsilon_vec}
+means = {key: [] for key in epsilon_vec}
+mins = {key: [] for key in epsilon_vec}
+maxs = {key: [] for key in epsilon_vec}
+for dataset_number in avg_samples_utility.keys():
+    for epsilon in avg_samples_utility[dataset_number].keys():
+        helper_out[epsilon].append(avg_samples_utility[dataset_number][epsilon])
+for epsilon in helper_out.keys():
+    means[epsilon] = np.mean(helper_out[epsilon], axis = 0)
+    mins[epsilon] = np.min(helper_out[epsilon], axis = 0)
+    maxs[epsilon] = np.max(helper_out[epsilon], axis = 0)
+
+expected_avg_utility, min_avg_utility, max_avg_utility = get_expected_statistics(avg_samples_utility,\
+                                                                    mean_predictive_errs_netmech,\
+                                                                    double_std_predictive_errs_netmech,\
+                                                                    mean_predictive_err_adassp,\
+                                                                    double_std_predictive_err_adassp, \
+                                                                    epsilon_vec)
+
+print (means[0.1])
+print (expected_avg_utility[0.1])
+for key in helper_out.keys():
+    assert np.all(expected_avg_utility[key] == means[key])
+    assert np.all(min_avg_utility[key] == mins[key])
+    assert np.all(max_avg_utility[key] == maxs[key])
