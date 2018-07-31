@@ -6,6 +6,7 @@ Created on Fri Jul 20 11:48:59 2018
 """
 
 import numpy as np
+import pickle
 
 def extract_data(results, multiple_datasets = False, max_dataset = 0, eps_dependent = False):
         
@@ -190,3 +191,16 @@ def get_optimal_utilities_statistics(max_utilities):
     min_optimal_utilities = np.min(list(max_utilities.values()), axis = 0)
     max_optimal_utilities = np.max(list(max_utilities.values()), axis = 0)
     return expected_optimal_utilities, min_optimal_utilities, max_optimal_utilities
+
+def load_results(num_datasets,epsilon_vec,num_points_features_vec, num_points_targets_vec, dimensionality,basepath):
+    results = {key_outer: {key_inner : [] for key_inner in epsilon_vec}  for key_outer in range(num_datasets)}
+    for dataset in range(num_datasets):
+        for epsilon in epsilon_vec:
+            for num_points_features, num_points_targets in zip(num_points_features_vec, num_points_targets_vec):
+                experiment_name = "s" + str(dataset) + "_eps" + str(epsilon).replace(".","") + "d" + \
+                            str(dimensionality) + "nt" + str(num_points_targets) + \
+                            "nf" + str(num_points_features)
+                path = basepath + experiment_name + '/DataLog/' + experiment_name
+                with open(path, 'rb') as container:
+                    results[dataset][epsilon].append(pickle.load(container))
+    return results
