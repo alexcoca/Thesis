@@ -549,9 +549,12 @@ class OutcomeSpaceGenerator(FileManager):
         # be computed as the outcomes are generated
                
         print("Number of batches is ", self.n_batches)
-        print("Starting parallel pool")
         if self.workers == -1:
-            self.workers = os.cpu_count()
+            if self.n_batches <= os.cpu_count():
+                self.workers = self.n_batches
+            else:
+                self.workers = os.cpu_count()
+        print("Starting parallel pool with {} workers".format(str(self.workers)))
         # pool = Pool(self.workers, initializer = self.initProcess, initargs = (math.inf, ))
         #manager = Manager()
         #self.max_scaled_utility = manager.Value('d', math.inf)
@@ -1142,7 +1145,8 @@ def est_outcome_space_size(N, d, k, covariance_only = False):
     else:
         return comb(N,d, exact = True)
 
-def outcome_space_ratio_calculator(outcome_space_sizes, dim_1, dim_2, num_points_1, num_points_2, num_points_min):
+def outcome_space_ratio_calculator(outcome_space_sizes, dim_1, dim_2, num_points_1, num_points_2, num_points_min, \
+                                   outcome_space_sizes_type = 'var_1', num_points_targets_1 = 0, num_points_targets_2 = 0):
     '''This function estimates the ratio of the sizes of two given outcome spaces:
     @ outcome_space_sizes: a dictionary with keys representing the synthethic vectors dimensionality.
     Each value is a list containing calculated outcome spaces sizes, for target and feature lattices obtained
@@ -1150,7 +1154,13 @@ def outcome_space_ratio_calculator(outcome_space_sizes, dim_1, dim_2, num_points
     @  dim_1, dim_2: The dimensionalities of the outcome spaces to be compared
     @ num_points_1, num_points_2: The number of points used for the discretisation of the lattices that generate
     the outcome spaces'''
-    num = outcome_space_sizes[dim_1][num_points_1 - num_points_min]
-    denum = outcome_space_sizes[dim_2][num_points_2 - num_points_min]
-    ratio = num/denum
-    return ratio
+    if outcome_space_sizes_type == 'var_1':
+        num = outcome_space_sizes[dim_1][num_points_1 - num_points_min]
+        denum = outcome_space_sizes[dim_2][num_points_2 - num_points_min]
+        ratio = num/denum
+        return ratio
+    elif outcome_space_sizes_type == 'var_2':
+        num = outcome_space_sizes[dim_1][num_points_1][num_points_targets_1][0]
+        denum = outcome_space_sizes[dim_2][num_points_2][num_points_targets_2][0]
+        ratio = num/denum
+        return ratio
