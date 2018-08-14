@@ -107,7 +107,7 @@ class FeaturesLattice(FileManager):
                 # in higher dimensions
                 radius = math.sqrt(radius**2 + x**2)
                 x_prev = x_prev[:(max_dim - dim)]
-                lb = math.sqrt(radius**2/dim) # TODO: Orig code had the update lb = math.sqrt(radius/dim) and passed all the tests. Re-test.
+                lb = math.sqrt(radius/dim) # TODO: Orig code had the update lb = math.sqrt(radius/dim) and passed all the tests. Re-test.
                 ub = radius
     
     def generate_permuted_solutions(self,points):
