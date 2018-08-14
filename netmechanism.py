@@ -770,10 +770,10 @@ class Sampler(FileManager):
             'Calculates the average and standard deviation of the sampled scores&utilities '
             self.sample_scores_avg = np.mean(self.sample_scores)
             self.sample_scores_std = np.std(self.sample_scores)
-            self.sample_utilities_avg = np.mean(self.sample_utilities)
-            self.sample_utilities_std = np.std(self.sample_utilities)
-            self.sample_max_utility = np.max(self.sample_utilities)
-            self.sample_min_utility = np.min(self.sample_utilities)
+            #self.sample_utilities_avg = np.mean(self.sample_utilities)
+            #self.sample_utilities_std = np.std(self.sample_utilities)
+            # self.sample_max_utility = np.max(self.sample_utilities)
+            # self.sample_min_utility = np.min(self.sample_utilities)
         
         if raw_partition_function == 0:
             raise ValueError("Partition value cannot be zero!")
@@ -1054,7 +1054,8 @@ class SyntheticDataGenerator(FileManager):
         max_delta_norm_std = np.std(max_delta_norm)
         
         # Calculate the difference between the optimal utility and the maximum sampled utility
-        max_utility = self.outcome_space.max_scaled_utility*1/self.outcome_space.scaling_const
+       # max_utility = self.outcome_space.max_scaled_utility*1/self.outcome_space.scaling_const
+        max_utility = 0 # TODO: Put this right - hack to sample uniformily
         delta_opt_avg = max_utility - self.sampler.sample_utilities_avg
         delta_opt_best = max_utility - self.sampler.sample_max_utility        
         delta_opt_worst = max_utility - self.sampler.sample_min_utility
