@@ -36,7 +36,8 @@ class FeaturesLattice(FileManager):
     
     def ordered_recursion(self,pos_lattice_coord, radius, dim,upper_bound):
         ''' This function recursively determines all ordered solutions of dimension d
-        (x_1,x_2,...,x_d) where s.t. x_i <= upper_bound for all i in [d]. The ordering chosen is x_1>=x_2>=...>=x_d)'''
+        (x_1,x_2,...,x_d) where s.t. x_i <= upper_bound for all i in [d]. The ordering chosen is x_1>=x_2>=...>=x_d).
+        Implementation of Procedure 1 in Algorithm 6.'''
         partial_solutions = []
         for coordinate in reversed([entry for entry in pos_lattice_coord if entry <= upper_bound]):
             if dim == 1:
@@ -46,12 +47,12 @@ class FeaturesLattice(FileManager):
                     
                     # Ensures the ordering is satisfied
                     if coordinate <= point[-1]:# or math.isclose(coordinate,point[-1],rel_tol=rel_tol): 
-                        candidate = point+[coordinate]
-                        candidate_norm = np.linalg.norm(candidate,ord=2)
+                        candidate = point + [coordinate]
+                        candidate_norm = np.linalg.norm(candidate, ord = 2)
                         # Techincally, this if could be excluded? TODO: Exclude and re-test code.
                         if math.isclose(candidate_norm,radius,rel_tol=self.rel_tol) or candidate_norm <= radius :
-                            partial_solutions.append(point+[coordinate])
-        # NB It is possible that solutions do not exist: e.g. if x_1 = 1 and we have even number of points
+                            partial_solutions.append(point + [coordinate])
+        # NB It is possible that solutions do not exist: e. g. if x_1 = 1 and we have even number of points
         #  , then there will not be any solution!                    
         return partial_solutions
     
@@ -67,7 +68,7 @@ class FeaturesLattice(FileManager):
             # of the remaining coordinates
             if radius**2 < x**2: 
                 # For numerical stability, the cases where the points are close to the sphere are handled separately
-                if math.isclose(radius**2,x**2,rel_tol = self.rel_tol):
+                if math.isclose(radius**2, x**2, rel_tol = self.rel_tol):
                     radius = 0.0
                     lb = 0.0
                     ub = x
@@ -85,7 +86,7 @@ class FeaturesLattice(FileManager):
                 x_prev.append(x)
             if dim == 1: 
                 if len(x_prev) == max_dim:
-                    assert math.isclose(np.linalg.norm(x_prev,ord = 2),1.0,rel_tol = self.rel_tol)
+                    assert math.isclose(np.linalg.norm(x_prev, ord = 2), 1.0, rel_tol = self.rel_tol)
                     self.points.append(x_prev)
             else:
                 # Recursive call to solve a lower dimensional problem, with updated radius and dimension
@@ -98,7 +99,7 @@ class FeaturesLattice(FileManager):
                 if low_d_soln:
                     for partial_soln in low_d_soln:
                         candidate = x_prev[0:max_dim-(dim-1)] + partial_soln
-                        assert math.isclose(np.linalg.norm(candidate,ord = 2),1.0,rel_tol = self.rel_tol) or (np.linalg.norm(candidate,ord=2) <= 1.0)
+                        # assert math.isclose(np.linalg.norm(candidate,ord = 2),1.0,rel_tol = self.rel_tol) or (np.linalg.norm(candidate,ord=2) <= 1.0)
                         self.points.append(candidate)
                         
                 # Update the radius and bounds after performing the computations for a particular dim.
@@ -106,7 +107,7 @@ class FeaturesLattice(FileManager):
                 # in higher dimensions
                 radius = math.sqrt(radius**2 + x**2)
                 x_prev = x_prev[:(max_dim - dim)]
-                lb = math.sqrt(radius/dim)
+                lb = math.sqrt(radius**2/dim) # TODO: Orig code had the update lb = math.sqrt(radius/dim) and passed all the tests. Re-test.
                 ub = radius
     
     def generate_permuted_solutions(self,points):
@@ -337,8 +338,8 @@ class OutcomeSpaceGenerator(FileManager):
                               
     def evaluate_sample_score(self, batch_index):
         
-        if self.scaling_const == 0:
-            raise ValueError("Scaling constant has not been calculated!")
+        #if self.scaling_const == 0:
+        #    raise ValueError("Scaling constant has not been calculated!")
         
         # Print some batch numbers to check progress
         if batch_index % 500 == 0:
@@ -826,7 +827,7 @@ class Sampler(FileManager):
                 for batch_idx, row_idx, col_idx in zip([key]*len(row_indices), row_indices, col_indices):
                     sample_indices.append((batch_idx, int(row_idx), int(col_idx)))
                     sample_scores.append(scores[row_idx, col_idx])
-                    sample_utilities.append(1/self.scaling_const*np.log(scores[row_idx, col_idx]))
+                    # sample_utilities.append(1/self.scaling_const*np.log(scores[row_idx, col_idx]))
             self.sample_scores = sample_scores
             self.sample_utilities = sample_utilities
             get_stats()
@@ -844,7 +845,7 @@ class Sampler(FileManager):
 #            self.sample_scores_avg = np.mean(self.sample_scores)
 #            self.sample_scores_std = np.std(self.sample_scores)
             # Calculate the mean and std of the utilities
-            self.sample_utilities = 1/self.scaling_const*np.log(self.sample_scores)
+            # self.sample_utilities = 1/self.scaling_const*np.log(self.sample_scores)
 #            self.sample_utilities_avg = np.mean(self.sample_utilities)
 #            self.sample_utilities_std = np.std(self.sample_utilities)
 #            print ("DEBUG: self.sample_scores", self.sample_scores)
